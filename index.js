@@ -1,18 +1,8 @@
 require('dotenv').config()
+
 const { ApolloServer } = require('apollo-server');
 const { resolvers } = require('./resolvers');
-const { typeDefs } = require('./schema.js')
-
-const books = [
-  {
-    title: 'Harry Potter and the Chamber of Secrets',
-    author: 'J.K. Rowling',
-  },
-  {
-    title: 'Jurassic Park',
-    author: 'Michael Crichton',
-  },
-];
+const { typeDefs } = require('./schema')
 
 // The ApolloServer constructor requires two parameters: your schema
 // definition and your set of resolvers.
