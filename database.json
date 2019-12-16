@@ -1,0 +1,9 @@
+{
+  "dev": {
+    "driver": "pg",
+    "user": "stephenbarlow",
+    "password": "",
+    "host": "localhost",
+    "database": "metagame"
+  }
+}
