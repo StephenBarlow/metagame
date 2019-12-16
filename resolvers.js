@@ -3,7 +3,7 @@ const connectionPool = require('./connection-pool')
 let resolvers = {
   Query: {
     sportsGames(parent, args, context, info) {
-      ;(async () => {
+      (async () => {
         const client = await connectionPool.connect();
         try {
           const res = await client.query('SELECT * FROM users WHERE id = $1', [1]);

@@ -18,6 +18,7 @@
   "homepage": "https://github.com/StephenBarlow/metagame#readme",
   "dependencies": {
     "apollo-server": "^2.9.13",
+    "async": "^3.1.0",
     "dotenv": "^8.2.0",
     "graphql": "^14.5.8",
     "pg": "^7.14.0"
