@@ -88,7 +88,7 @@ exports.typeDefs = gql`
   }
 
   input CreateSportsGameRequest {
-    league: SportsLeague!
+    league: SportsLeague
     awayTeamShortName: String!
     homeTeamShortName: String!
     scheduledStart: String

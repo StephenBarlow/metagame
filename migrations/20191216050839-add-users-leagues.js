@@ -15,9 +15,9 @@ exports.setup = function(options, seedLink) {
   seed = seedLink;
 };
 
-exports.up = function(db, callback) {
-  async.series([
-    db.createTable.bind(db, 'users', {
+exports.up = async function(db) {
+  return await Promise.all([
+    db.createTable('users', {
       id: {
         type: 'int',
         unsigned: true,
@@ -28,7 +28,7 @@ exports.up = function(db, callback) {
         type: 'string'
       }
     }),
-    db.createTable.bind(db, 'fantasy-leagues', {
+    db.createTable('fantasy_leagues', {
       id: {
         type: 'int',
         unsigned: true,
@@ -39,16 +39,20 @@ exports.up = function(db, callback) {
         type: 'int',
         unsigned: true,
         notNull: true
+      },
+      name: {
+        type: 'string',
+        notNull: true
       }
     })
-  ], callback);
+  ]);
 };
 
-exports.down = function(db) {
-  async.series([
-    db.dropTable.bind(db, 'users'),
-    db.dropTable.bind(db, 'fantasy-leagues')
-  ], callback);
+exports.down = async function(db, callback) {
+  return await Promise.all([
+    db.dropTable('users'),
+    db.dropTable('fantasy_leagues')
+  ]);
 };
 
 exports._meta = {
