@@ -84,6 +84,41 @@ let resolvers = {
       } finally {
         client.release();
       }
+    },
+
+    async addUserToFantasyLeague(parent, args, context, info) {
+      const client = await connectionPool.connect();
+      try {
+        const { userID, leagueID } = args.request;
+
+        const res = await client.query('INSERT INTO memberships(user_id, league_id) VALUES ($1, $2) returning *', [userID, leagueID]);
+
+        const createdUser = res.rows[0];
+
+        return {
+          league: null
+        };
+      } catch (error) {
+        let gqlError = {
+          code: GQL_UNKNOWN_ERROR,
+          message: 'An unkonwn error occurred'
+        }
+
+        const errorCode = error.code;
+
+        // This currently can't happen because there is no uniqueness constraint
+        // on this table included in existing migrations.
+        if (errorCode == PG_UNIQUE_VIOLATION) {
+          gqlError.code = GQL_UNIQUE_VIOLATION;
+          gqlError.message = 'That user is already a member of the specified league.'
+        }
+
+        return {
+          errors: [gqlError]
+        };
+      } finally {
+        client.release();
+      }
     }
   }
 };

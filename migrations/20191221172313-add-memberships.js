@@ -41,7 +41,7 @@ exports.up = async function(db) {
 };
 
 exports.down = function(db) {
-  return null;
+  return db.dropTable('memberships');
 };
 
 exports._meta = {
