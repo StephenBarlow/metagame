@@ -117,7 +117,7 @@ exports.typeDefs = gql`
   }
 
   type Error {
-    code: Int!
+    code: String!
     message: String
   }
 

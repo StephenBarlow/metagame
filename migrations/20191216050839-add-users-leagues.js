@@ -25,7 +25,8 @@ exports.up = async function(db) {
         autoIncrement: true
       },
       email: {
-        type: 'string'
+        type: 'string',
+        unique: true
       }
     }),
     db.createTable('fantasy_leagues', {
