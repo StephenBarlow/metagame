@@ -1,0 +1,130 @@
+[
+  {
+    "name": "Arizona Cardinals",
+    "shortname": "ARI"
+  },
+  {
+    "name": "Atlanta Falcons",
+    "shortname": "ATL"
+  },
+  {
+    "name": "Carolina Panthers",
+    "shortname": "CAR"
+  },
+  {
+    "name": "Chicago Bears",
+    "shortname": "CHI"
+  },
+  {
+    "name": "Dallas Cowboys",
+    "shortname": "DAL"
+  },
+  {
+    "name": "Detroit Lions",
+    "shortname": "DET"
+  },
+  {
+    "name": "Green Bay Packers",
+    "shortname": "GB"
+  },
+  {
+    "name": "Los Angeles Rams",
+    "shortname": "LAR"
+  },
+  {
+    "name": "Minnesota Vikings",
+    "shortname": "MIN"
+  },
+  {
+    "name": "New Orleans Saints",
+    "shortname": "NO"
+  },
+  {
+    "name": "New York Giants",
+    "shortname": "NYG"
+  },
+  {
+    "name": "Philadelphia Eagles",
+    "shortname": "PHI"
+  },
+  {
+    "name": "San Francisco 49ers",
+    "shortname": "SF"
+  },
+  {
+    "name": "Seattle Seahawks",
+    "shortname": "SEA"
+  },
+  {
+    "name": "Tampa Bay Buccaneers",
+    "shortname": "TB"
+  },
+  {
+    "name": "Washington Football Team",
+    "shortname": "WAS"
+  },
+  {
+    "name": "Baltimore Ravens",
+    "shortname": "BAL"
+  },
+  {
+    "name": "Buffalo Bills",
+    "shortname": "BUF"
+  },
+  {
+    "name": "Cincinnati Bengals",
+    "shortname": "CIN"
+  },
+  {
+    "name": "Cleveland Browns",
+    "shortname": "CLE"
+  },
+  {
+    "name": "Denver Broncos",
+    "shortname": "DEN"
+  },
+  {
+    "name": "Houston Texans",
+    "shortname": "HOU"
+  },
+  {
+    "name": "Indianapolis Colts",
+    "shortname": "IND"
+  },
+  {
+    "name": "Jacksonville Jaguars",
+    "shortname": "JAX"
+  },
+  {
+    "name": "Kansas City Chiefs",
+    "shortname": "KC"
+  },
+  {
+    "name": "Las Vegas Raiders",
+    "shortname": "LV"
+  },
+  {
+    "name": "Los Angeles Chargers",
+    "shortname": "LAC"
+  },
+  {
+    "name": "Miami Dolphins",
+    "shortname": "MIA"
+  },
+  {
+    "name": "New England Patriots",
+    "shortname": "NE"
+  },
+  {
+    "name": "New York Jets",
+    "shortname": "NYJ"
+  },
+  {
+    "name": "Pittsburgh Steelers",
+    "shortname": "PIT"
+  },
+  {
+    "name": "Tennessee Titans",
+    "shortname": "TEN"
+  }
+]
