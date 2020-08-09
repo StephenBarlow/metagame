@@ -15,33 +15,38 @@ exports.setup = function(options, seedLink) {
 };
 
 exports.up = function(db) {
-  return db.createTable('memberships', {
+  return db.createTable('sports_games', {
     id: {
       type: 'int',
       unsigned: true,
       primaryKey: true,
       autoIncrement: true
     },
-    user_id: {
-      type: 'string',
-      notNull: true
+    away_team_id: {
+      type: 'int',
+      notNull: true,
     },
-    league_id: {
-      type: 'string',
-      notNull: true
+    home_team_id: {
+      type: 'int',
+      notNull: true,
     },
-    created_at: {
+    start_time: {
       type: 'timestamp',
-      defaultValue: new String('CURRENT_TIMESTAMP')
+      notNull: true
     },
-    revoked_at: {
-      type: 'timestamp'
+    week: {
+      type: 'int'
+    },
+    sports_league: {
+      type: 'SPORTS_LEAGUE',
+      notNull: true,
+      defaultValue: 'NFL'
     }
   });
 };
 
 exports.down = function(db) {
-  return db.dropTable('memberships');
+  return db.dropTable('sports_games');
 };
 
 exports._meta = {
