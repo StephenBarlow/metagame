@@ -30,6 +30,12 @@ exports.up = function(db) {
       type: 'int',
       notNull: true,
     },
+    away_team_score: {
+      type: 'int'
+    },
+    home_team_score: {
+      type: 'int'
+    },
     start_time: {
       type: 'timestamp',
       notNull: true
