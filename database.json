@@ -1,4 +1,7 @@
 {
+  "prod": {
+    "ENV": "DATABASE_URL"
+  },
   "dev": {
     "driver": "pg",
     "user": "stephenbarlow",
