@@ -105,7 +105,7 @@ exports.typeDefs = gql`
   }
 
   type Query {
-    user(userID: ID, email: String): User
+    me: User
     league(leagueID: ID): SportsLeague
     leagues(userID: ID): [FantasyLeague!]
     picks(leagueID: ID!, userID: ID, week: Int): [Pick!]
