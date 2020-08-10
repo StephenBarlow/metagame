@@ -30,6 +30,10 @@ exports.up = function(db) {
       type: 'string',
       notNull: true
     },
+    display_name: {
+      type: 'string',
+      notNull: true
+    },
     created_at: {
       type: 'timestamp',
       defaultValue: new String('CURRENT_TIMESTAMP')
