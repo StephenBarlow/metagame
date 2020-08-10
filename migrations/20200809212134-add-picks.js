@@ -22,6 +22,10 @@ exports.up = function(db) {
       primaryKey: true,
       autoIncrement: true
     },
+    league_id: {
+      type: 'int',
+      notNull: true
+    },
     user_id: {
       type: 'int',
       notNull: true

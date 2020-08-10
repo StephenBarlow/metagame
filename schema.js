@@ -4,22 +4,25 @@ exports.typeDefs = gql`
   type Pick {
     user: User!
     league: FantasyLeague!
-    teams: [SportsTeam!]
+    team: SportsTeam!
     week: Int
+    isInvalidated: Boolean!
   }
 
   input SubmitPickRequest {
     userID: ID!
     leagueID: ID!
     teamIDs: [ID!]
+    week: Int!
   }
 
   type SubmitPickResponse {
-    pick: Pick
+    pick: [Pick!]
     errors: [Error!]
   }
 
   type User {
+    id: ID!
     email: String!
     displayName: String
     fantasyLeagues: [FantasyLeague!]
@@ -48,7 +51,8 @@ exports.typeDefs = gql`
     id: ID!
     name: String!
     owner: User!
-    members: [User!]
+    users: [User!]
+    picks: [Pick!]
     gameMode: GameMode!
   }
 
@@ -68,23 +72,22 @@ exports.typeDefs = gql`
     name: String!
     shortName: String!
     sportsLeague: SportsLeague!
-    conference: String
-    division: String
   }
 
   type SportsGame {
-    scheduledStart: String
+    id: ID!
+    sportsLeague: SportsLeague!
+    startsAt: String!
     awayTeam: SportsTeam!
     homeTeam: SportsTeam!
     season: String!
-    round: Int
+    week: Int!
     result: SportsGameResult
   }
 
   type SportsGameResult {
-    startedAt: String
-    awayTeamScore: Int
-    homeTeamScore: Int
+    awayTeamScore: Int!
+    homeTeamScore: Int!
   }
 
   input CreateSportsGameRequest {
@@ -103,9 +106,9 @@ exports.typeDefs = gql`
 
   type Query {
     user(userID: ID, email: String): User
+    league(leagueID: ID): SportsLeague
     leagues(userID: ID): [FantasyLeague!]
     picks(leagueID: ID!, userID: ID, week: Int): [Pick!]
-    members(leagueID: ID!): [User!]
     sportsTeams(league: SportsLeague): [SportsTeam!]
     sportsGames(league: SportsLeague, season: String, week: Int): [SportsGame!]
   }

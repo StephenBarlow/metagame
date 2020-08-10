@@ -7,7 +7,9 @@ const resolvers = {
     async leagues(parent, args, { db }, info) {
       try {
         const result = await db.query('SELECT * FROM fantasy_leagues');
-        return result.rows;
+        return result.rows.map(function(row) {
+          return leagueFromRow(row);
+        });
       } catch (err) {
         console.log(err.stack);
       }
@@ -16,9 +18,17 @@ const resolvers = {
       try {
         const result = await db.query('SELECT * FROM teams');
         return result.rows.map(function(row) {
-          return {
-            shortName: row.short_name
-          };
+          return teamFromRow(row);
+        });
+      } catch (err) {
+        console.log(err.stack);
+      }
+    },
+    async sportsGames(parent, args, { db }, info) {
+      try {
+        const result = await db.query('SELECT * FROM sports_games');
+        return result.rows.map(function(row) {
+          return gameFromRow(row);
         });
       } catch (err) {
         console.log(err.stack);
@@ -127,7 +137,129 @@ const resolvers = {
         client.release();
       }
     }
+  },
+  SportsGame: {
+    async awayTeam(game, args, { db }, info) {
+      try {
+        const result = await db.query('SELECT * FROM sports_teams WHERE id = $1 LIMIT 1', [game.awayTeamID]);
+        return teamFromRow(result.rows[0]);
+      } catch (err) {
+        console.log(err.stack);
+      }
+    },
+    async homeTeam(game, args, { db }, info) {
+      try {
+        const result = await db.query('SELECT * FROM sports_teams WHERE id = $1 LIMIT 1', [game.homeTeamID]);
+        return teamFromRow(result.rows[0]);
+      } catch (err) {
+        console.log(err.stack);
+      }
+    },
+    async result(game, args, { db }, info) {
+      if (game.awayTeamScore === null || game.homeTeamScore === null) {
+        return null;
+      }
+      return {
+        awayTeamScore: game.awayTeamScore,
+        homeTeamScore: game.homeTeamScore
+      };
+    }
+  },
+  FantasyLeague: {
+    async owner(league, args, { db }, info) {
+      const result = await db.query('SELECT users.*, memberships.display_name FROM users INNER JOIN memberships ON (users.id = memberships.user_id) WHERE memberships.league_id = $1 AND users.id = $2 LIMIT 1', [league.id, league.ownerID]);
+      return userFromRow(result.rows[0]);
+    },
+    async users(league, args, { db }, info) {
+      const result = await db.query('SELECT users.*, memberships.display_name FROM users INNER JOIN memberships ON (users.id = memberships.user_id) WHERE memberships.league_id = $1', [league.id]);
+      return result.rows.map(function(row) {
+        return userFromRow(row);
+      });
+    },
+    async picks(league, args, { db }, info) {
+      const result = await db.query('SELECT * FROM picks WHERE league_id = $1', [league.id]);
+      return result.rows.map(function(row) {
+        return pickFromRow(row);
+      });
+    }
+  },
+  Pick: {
+    async user(pick, args, { db }, info) {
+      const result = await db.query('SELECT users.*, memberships.display_name FROM users INNER JOIN memberships ON (users.id = memberships.user_id) WHERE memberships.league_id = $1 AND users.id = $2 LIMIT 1', [pick.leagueID, pick.userID]);
+      return userFromRow(result.rows[0]);
+    },
+    async league(pick, args, { db }, info) {
+      const result = await db.query('SELECT * FROM fantasy_leagues WHERE id = $1 LIMIT 1', [pick.leagueID]);
+      return leagueFromRow(result.rows[0]);
+    },
+    async team(pick, args, { db }, info) {
+      const result = await db.query('SELECT * FROM sports_teams WHERE id = $1 LIMIT 1', [pick.teamID]);
+      return teamFromRow(result.rows[0]);
+    },
+  },
+  User: {
+    async fantasyLeagues(user, args, { db }, info) {
+      const result = await db.query('SELECT fantasy_leagues.* FROM fantasy_leagues INNER JOIN memberships ON (fantasy_leagues.id = memberships.league_id) WHERE memberships.user_id = $1', [user.id]);
+      return result.rows.map(function(row) {
+        return leagueFromRow(row);
+      });
+    },
   }
 };
+
+function pickFromRow(row) {
+  return {
+    week: row.week,
+    isInvalidated: !(row.invalidated_at === null),
+
+    // Not schema fields, but used by subresolvers
+    userID: row.user_id,
+    leagueID: row.league_id,
+    teamID: row.team_id
+  }
+}
+
+function userFromRow(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+  }
+}
+
+function leagueFromRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    gameMode: row.game_mode,
+
+    // Not schema fields, but used by subresolvers
+    ownerID: row.owner_id
+  };
+}
+
+function teamFromRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    shortName: row.short_name,
+    sportsLeague: row.sports_league
+  };
+}
+
+function gameFromRow(row) {
+  return {
+    id: row.id,
+    sportsLeague: row.sports_league,
+    startsAt: row.start_time,
+    week: row.week,
+
+    // Not schema fields, but used by subresolvers
+    awayTeamID: row.away_team_id,
+    homeTeamID: row.home_team_id,
+    awayTeamScore: row.away_team_score,
+    homeTeamScore: row.home_team_score
+  };
+}
 
 exports.resolvers = resolvers;
