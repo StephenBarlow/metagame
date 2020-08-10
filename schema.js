@@ -65,8 +65,8 @@ exports.typeDefs = gql`
 
   type SportsTeam {
     id: ID!
-    shortName: String!
     name: String!
+    shortName: String!
     sportsLeague: SportsLeague!
     conference: String
     division: String
@@ -103,9 +103,11 @@ exports.typeDefs = gql`
 
   type Query {
     user(userID: ID, email: String): User
-    picksForFantasyLeague(leagueID: ID!, userID: ID, week: Int): [Pick!]
-    usersForFantasyLeague(leagueID: ID!): [User!]
-    sportsGames(league: SportsLeague!, season: String, week: Int): [SportsGame!]
+    leagues(userID: ID): [FantasyLeague!]
+    picks(leagueID: ID!, userID: ID, week: Int): [Pick!]
+    members(leagueID: ID!): [User!]
+    sportsTeams(league: SportsLeague): [SportsTeam!]
+    sportsGames(league: SportsLeague, season: String, week: Int): [SportsGame!]
   }
 
   type Mutation {

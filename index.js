@@ -1,14 +1,36 @@
 require('dotenv').config()
 
 const { ApolloServer } = require('apollo-server');
+const { connectionPool } = require('./connection-pool')
 const { typeDefs } = require('./schema')
 const { resolvers } = require('./resolvers');
 
-// The ApolloServer constructor requires two parameters: your schema
-// definition and your set of resolvers.
-const server = new ApolloServer({ typeDefs, resolvers });
+const server = new ApolloServer({
+  typeDefs,
+  resolvers,
+  context: async () => ({
+    db: await connectionPool.connect()
+  }),
+  plugins: [
+    {
+      serverWillStart() {
+        console.log('Server starting up');
+      },
+      requestDidStart() {
+        console.log('Operation received');
 
-// The `listen` method launches a web server.
+        return {
+
+          // Close the database connection when all resolvers are done
+          willSendResponse({ context }) {
+            context.db.release();
+          }
+        }
+      }
+    }
+  ]
+});
+
 server.listen().then(({ url }) => {
   console.log(`🚀  Server ready at ${url}`);
 });

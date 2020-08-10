@@ -1,21 +1,28 @@
-const { connectionPool } = require('./connection-pool')
-
 const PG_UNIQUE_VIOLATION = '23505';
 const GQL_UNKNOWN_ERROR = 'ERR_UNKNOWN'
 const GQL_UNIQUE_VIOLATION = 'ERR_DUPLICATE';
 
-let resolvers = {
+const resolvers = {
   Query: {
-    sportsGames(parent, args, context, info) {
-      (async () => {
-        const client = await connectionPool.connect();
-        try {
-          const res = await  client.query('SELECT * FROM users WHERE id = $1', [1]);
-          console.log(res.rows[0]);
-        } finally {
-          client.release();
-        }
-      })().catch(err => console.log(err.stack))
+    async leagues(parent, args, { db }, info) {
+      try {
+        const result = await db.query('SELECT * FROM fantasy_leagues');
+        return result.rows;
+      } catch (err) {
+        console.log(err.stack);
+      }
+    },
+    async sportsTeams(parent, args, { db }, info) {
+      try {
+        const result = await db.query('SELECT * FROM teams');
+        return result.rows.map(function(row) {
+          return {
+            shortName: row.short_name
+          };
+        });
+      } catch (err) {
+        console.log(err.stack);
+      }
     }
   },
   Mutation: {
