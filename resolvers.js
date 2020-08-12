@@ -1,6 +1,9 @@
+const emailValidator = require('email-validator');
+
 const PG_UNIQUE_VIOLATION = '23505';
 const GQL_UNKNOWN_ERROR = 'ERR_UNKNOWN'
 const GQL_UNIQUE_VIOLATION = 'ERR_DUPLICATE';
+const GQL_INVALID_INPUT = 'ERR_INVALID_INPUT'
 
 const resolvers = {
   Query: {
@@ -75,11 +78,21 @@ const resolvers = {
       }
     },
 
-    async createUser(parent, args, context, info) {
-      const client = await connectionPool.connect();
+    async createUser(parent, { request }, { db }, info) {
+      const { email } = request;
+
+      if (!emailValidator.validate(email)) {
+        return {
+          errors: [{
+            code: GQL_INVALID_INPUT,
+            message: 'Please provide a valid email address.'
+          }]
+        };
+      }
+
       try {
-        const { email } = args.request;
-        const res = await client.query('INSERT INTO "users"(email) VALUES ($1) returning *', [email]);
+
+        const res = await db.query('INSERT INTO "users"(email) VALUES ($1) returning *', [email]);
 
         const createdUser = res.rows[0];
 
@@ -106,8 +119,6 @@ const resolvers = {
           errors: [gqlError]
         };
 
-      } finally {
-        client.release();
       }
     },
 
