@@ -4,6 +4,14 @@ const GQL_UNIQUE_VIOLATION = 'ERR_DUPLICATE';
 
 const resolvers = {
   Query: {
+    async user(parent, { email }, { db }, info) {
+      const result = await db.query ('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]);
+      if (result.rows.length === 0){
+        return null;
+      } else {
+        return userFromRow(result.rows[0]);
+      }
+    },
     async leagues(parent, args, { db }, info) {
       try {
         const result = await db.query('SELECT * FROM fantasy_leagues');
