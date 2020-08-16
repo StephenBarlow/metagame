@@ -105,7 +105,7 @@ const resolvers = {
       } catch (error) {
         let gqlError = {
           code: GQL_UNKNOWN_ERROR,
-          message: 'An unkonwn error occurred'
+          message: 'An unknown error occurred'
         }
 
         const errorCode = error.code;
@@ -154,6 +154,29 @@ const resolvers = {
         };
       } finally {
         client.release();
+      }
+    },
+
+    async submitPick(parent, { request }, { db }, info) {
+      if (validatePick(request)) {
+        const picks = registerPick(request);
+        if (!picks) {
+          return {
+            picks: null,
+            errors: [{
+              code: GQL_UNKNOWN_ERROR,
+              message: 'Storing the pick failed. Please retry.'
+            }]
+          };
+        }
+      } else {
+        return {
+          picks: null,
+          errors: [{
+            code: GQL_INVALID_INPUT,
+            message: 'The submitted pick is invalid.'
+          }]
+        }
       }
     }
   },
@@ -225,6 +248,85 @@ const resolvers = {
     },
   }
 };
+
+async function registerPick(pickRequest, db) {
+  const { leagueID } = pickRequest;
+  const result = await db.query('SELECT game_mode FROM fantasy_leagues WHERE id = $1 LIMIT 1', [leagueID]);
+  if (result.rows.length === 0){
+
+    // Fantasy league not found
+    return false;
+  } else if (result.rows[0].game_mode === 'PICK_TWO'){
+    return registerPickTwoPick(pickRequest, db);
+  } else {
+
+    // Unrecognized game mode
+    return false;
+  }
+}
+
+async function registerPickTwoPick(pickRequest, db) {
+  const { userID, leagueID, teamIDs, week } = pickRequest;
+  let responseRows = [];
+
+  try {
+
+    // Begin transaction
+    await db.query('BEGIN');
+
+    // Invalidate any existing picks for this week
+    await db.query('UPDATE picks SET invalidated_at=CURRENT_TIMESTAMP WHERE week = $1 AND invalidated_at IS NULL', [week]);
+
+    // Create a pick row for each team included in the pick
+    for (const teamID of teamIDs) {
+      const response = await db.query('INSERT INTO picks(league_id, user_id, team_id, week) VALUES ($1, $2, $3, $4)', [leagueID, userID, teamID, week]);
+      responseRows.push(response.rows[0]);
+    }
+
+    // Commit transaction
+    await db.query('COMMIT')
+  } catch (e) {
+    await db.query('ROLLBACK')
+    return false;
+  }
+
+  return responseRows;
+}
+
+async function validatePick(pickRequest, db) {
+  const { leagueID } = pickRequest;
+  const result = await db.query('SELECT game_mode FROM fantasy_leagues WHERE id = $1 LIMIT 1', [leagueID]);
+  if (result.rows.length === 0){
+
+    // Fantasy league not found
+    return false;
+  } else if (result.rows[0].game_mode === 'PICK_TWO'){
+    return validatePickTwoPick(pickRequest, db);
+  } else {
+
+    // Unrecognized game mode
+    return false;
+  }
+}
+
+async function validatePickTwoPick(pickRequest, db) {
+  const { userID, leagueID, teamIDs, week } = pickRequest;
+
+  const pastPicks = await db.query('SELECT * FROM picks WHERE league_id = $1 AND user_id = $2 AND week != $3 AND invalidated_at IS NULL ', [leagueID, userID, week]);
+
+  // Check if any picked team has been picked before
+  for (const row of pastPicks.rows) {
+    if (teamIDs.includes(row.team_id)) {
+      // At least one of these teams has already been picked by this player
+      return false;
+    }
+  }
+
+  // TODO: Make sure the picked team has a game in the specified week
+
+  // Looks like a valid pick
+  return true;
+}
 
 function pickFromRow(row) {
   return {
