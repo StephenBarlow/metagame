@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/StephenBarlow/metagame#readme",
   "dependencies": {
-    "apollo-server": "^2.9.13",
+    "apollo-server": "^2.16.1",
     "async": "^3.1.0",
     "db-migrate": "^0.11.11",
     "db-migrate-pg": "^1.2.2",

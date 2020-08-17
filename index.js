@@ -10,6 +10,10 @@ const PORT = process.env.PORT || 4000;
 const server = new ApolloServer({
   typeDefs,
   resolvers,
+  engine: {
+    reportSchema: true,
+    variant: 'current'
+  },
   context: async () => ({
     db: await connectionPool.connect()
   }),
