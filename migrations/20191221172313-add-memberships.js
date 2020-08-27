@@ -23,11 +23,11 @@ exports.up = function(db) {
       autoIncrement: true
     },
     user_id: {
-      type: 'string',
+      type: 'int',
       notNull: true
     },
     league_id: {
-      type: 'string',
+      type: 'int',
       notNull: true
     },
     display_name: {

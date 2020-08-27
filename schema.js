@@ -24,7 +24,7 @@ exports.typeDefs = gql`
   type User {
     id: ID!
     email: String!
-    displayName: String
+    displayName(leagueID: ID!): String
     fantasyLeagues: [FantasyLeague!]
   }
 
@@ -107,7 +107,7 @@ exports.typeDefs = gql`
   type Query {
     user(email: String!): User
     league(leagueID: ID): FantasyLeague
-    leagues(userID: ID): [FantasyLeague!]
+    leagues(userEmail: String): [FantasyLeague!]
     picks(leagueID: ID!, userID: ID, week: Int): [Pick!]
     sportsTeams(league: SportsLeague): [SportsTeam!]
     sportsGames(league: SportsLeague, season: String, week: Int): [SportsGame!]

@@ -15,7 +15,18 @@ const resolvers = {
         return userFromRow(result.rows[0]);
       }
     },
-    async leagues(parent, args, { db }, info) {
+    async league(parent, { leagueID }, { db }, info) {
+      try {
+        const result = await db.query('SELECT * FROM fantasy_leagues WHERE id = $1', [leagueID]);
+        if (result.rows.length === 0) {
+          return null;
+        }
+        return leagueFromRow(result.rows[0]);
+      } catch (err) {
+        console.log(err.stack);
+      }
+    },
+    async leagues(parent, { userEmail }, { db }, info) {
       try {
         const result = await db.query('SELECT * FROM fantasy_leagues');
         return result.rows.map(function(row) {
@@ -245,6 +256,14 @@ const resolvers = {
       return result.rows.map(function(row) {
         return leagueFromRow(row);
       });
+    },
+
+    async displayName(user, { leagueID }, { db }, info) {
+      const result = await db.query('SELECT display_name FROM memberships INNER JOIN fantasy_leagues ON (fantasy_leagues.id = memberships.league_id) WHERE memberships.user_id = $1 AND fantasy_leagues.id = $2 LIMIT 1', [user.id, leagueID]);
+      if (result.rows === 0) {
+        return null;
+      }
+      return result.rows[0].display_name;
     },
   }
 };
