@@ -10,12 +10,8 @@ const PORT = process.env.PORT || 4000;
 const server = new ApolloServer({
   typeDefs,
   resolvers,
-  engine: {
-    reportSchema: true,
-    variant: 'current'
-  },
   context: async () => ({
-    db: await connectionPool.connect()
+    //db: await connectionPool.connect()
   }),
   plugins: [
     {
@@ -29,7 +25,7 @@ const server = new ApolloServer({
 
           // Close the database connection when all resolvers are done
           willSendResponse({ context }) {
-            context.db.release();
+            //context.db.release();
           }
         }
       }
