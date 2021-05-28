@@ -22,12 +22,12 @@ exports.up = function(db) {
       primaryKey: true,
       autoIncrement: true
     },
-    away_team_id: {
-      type: 'int',
+    away_team_short_name: {
+      type: 'string',
       notNull: true,
     },
-    home_team_id: {
-      type: 'int',
+    home_team_short_name: {
+      type: 'string',
       notNull: true,
     },
     away_team_score: {
@@ -38,6 +38,10 @@ exports.up = function(db) {
     },
     start_time: {
       type: 'timestamp',
+      notNull: true
+    },
+    season: {
+      type: 'int',
       notNull: true
     },
     week: {

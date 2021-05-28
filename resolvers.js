@@ -194,7 +194,7 @@ const resolvers = {
   SportsGame: {
     async awayTeam(game, args, { db }, info) {
       try {
-        const result = await db.query('SELECT * FROM sports_teams WHERE id = $1 LIMIT 1', [game.awayTeamID]);
+        const result = await db.query('SELECT * FROM teams WHERE short_name = $1 AND sports_league = $2 LIMIT 1', [game.awayTeamShortName, game.sportsLeague]);
         return teamFromRow(result.rows[0]);
       } catch (err) {
         console.log(err.stack);
@@ -202,7 +202,7 @@ const resolvers = {
     },
     async homeTeam(game, args, { db }, info) {
       try {
-        const result = await db.query('SELECT * FROM sports_teams WHERE id = $1 LIMIT 1', [game.homeTeamID]);
+        const result = await db.query('SELECT * FROM teams WHERE short_name = $1 LIMIT 1', [game.homeTeamShortName]);
         return teamFromRow(result.rows[0]);
       } catch (err) {
         console.log(err.stack);
@@ -395,8 +395,8 @@ function gameFromRow(row) {
     week: row.week,
 
     // Not schema fields, but used by subresolvers
-    awayTeamID: row.away_team_id,
-    homeTeamID: row.home_team_id,
+    awayTeamShortName: row.away_team_short_name,
+    homeTeamShortName: row.home_team_short_name,
     awayTeamScore: row.away_team_score,
     homeTeamScore: row.home_team_score
   };
