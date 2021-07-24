@@ -1,26 +1,60 @@
-const { Pool } = require('pg');
 const { URL } = require('url');
+const { SQLDataSource } = require('datasource-sql');
 
-let databaseURL = null;
-if (process.env.DATABASE_URL) {
-  databaseURL = new URL(process.env.DATABASE_URL);
+const HOUR = 3600;
+const MINUTE = 60;
+
+class PGDB extends SQLDataSource {
+  async getTeams() {
+    const val = await this.knex
+      .select('*')
+      .from('teams')
+      .cache(HOUR);
+    return val;
+  }
+
+  async getSportsGames() {
+    const val = await this.knex
+      .select('*')
+      .from('sports_games')
+      .cache(HOUR);
+    return val;
+  }
+
+  async getUser(email) {
+    const val = await this.knex
+      .select('*')
+      .from('users')
+      .where({
+        'email': email
+      })
+      .limit(1)
+      .cache(MINUTE);
+    if (val.length) {
+      return val[0];
+    }
+  }
+
+  async getLeagues(userEmail) {
+    const val = await this.knex
+      .select('*')
+      .from('fantasy_leagues')
+      .cache(MINUTE);
+    return val;
+  }
+
+  async getLeague(leagueID) {
+    const val = await this.knex
+      .select('*')
+      .from('fantasy_leagues')
+      .where({
+        'id': leagueID
+      })
+      .cache(HOUR);
+    if (val.length) {
+      return val[0];
+    }
+  }
 }
 
-let pool = null;
-
-if (databaseURL) {
-  pool = new Pool({
-    user: databaseURL.username,
-    host: databaseURL.hostname,
-    database: databaseURL.pathname.split('/')[1],
-    password: databaseURL.password,
-    port: databaseURL.port,
-  })
-} else {
-  pool = new Pool({
-    idleTimeoutMillis: 1000,
-    connectionTimeoutMillis: 2000
-  });
-}
-
-exports.connectionPool = pool;
+exports.DataSource = PGDB;

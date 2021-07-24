@@ -7,51 +7,44 @@ const GQL_INVALID_INPUT = 'ERR_INVALID_INPUT'
 
 const resolvers = {
   Query: {
-    async user(parent, { email }, { db }, info) {
-      const result = await db.query ('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]);
-      if (result.rows.length === 0){
-        return null;
-      } else {
-        return userFromRow(result.rows[0]);
-      }
-    },
-    async league(parent, { leagueID }, { db }, info) {
+    async user(parent, { email }, { dataSources }, info) {
       try {
-        const result = await db.query('SELECT * FROM fantasy_leagues WHERE id = $1', [leagueID]);
-        if (result.rows.length === 0) {
-          return null;
-        }
-        return leagueFromRow(result.rows[0]);
+        const result = await dataSources.pg.getUser(email);
+        return result;
       } catch (err) {
         console.log(err.stack);
       }
     },
-    async leagues(parent, { userEmail }, { db }, info) {
+    async league(parent, { leagueID }, { dataSources }, info) {
       try {
-        const result = await db.query('SELECT * FROM fantasy_leagues');
-        return result.rows.map(function(row) {
+        const result = await dataSources.pg.getLeague(leagueID);
+        return leagueFromRow(result);
+      } catch (err) {
+        console.log(err.stack);
+      }
+    },
+    async leagues(parent, { userEmail }, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getLeagues(userEmail);
+        return result.map(function(row) {
           return leagueFromRow(row);
         });
       } catch (err) {
         console.log(err.stack);
       }
     },
-    async sportsTeams(parent, args, { db }, info) {
+    async sportsTeams(parent, args, { dataSources }, info) {
       try {
-        const result = await db.query('SELECT * FROM teams');
-        return result.rows.map(function(row) {
-          return teamFromRow(row);
-        });
+        const result = await dataSources.pg.getTeams();
+        return result;
       } catch (err) {
         console.log(err.stack);
       }
     },
-    async sportsGames(parent, args, { db }, info) {
+    async sportsGames(parent, args, { dataSources }, info) {
       try {
-        const result = await db.query('SELECT * FROM sports_games');
-        return result.rows.map(function(row) {
-          return gameFromRow(row);
-        });
+        const result = await dataSources.pg.getSportsGames();
+        return result;
       } catch (err) {
         console.log(err.stack);
       }

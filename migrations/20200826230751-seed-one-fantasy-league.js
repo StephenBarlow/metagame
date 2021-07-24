@@ -15,6 +15,12 @@ exports.setup = function(options, seedLink) {
 };
 
 exports.up = async function(db) {
+  await db.insert('users', [
+    'email'
+  ], [
+    'test@example.com'
+  ]);
+  
   await db.insert('fantasy_leagues', [
     'owner_id', 'name', 'game_mode'
   ], [
