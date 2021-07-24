@@ -17,14 +17,15 @@
   },
   "homepage": "https://github.com/StephenBarlow/metagame#readme",
   "dependencies": {
-    "apollo-server": "^2.25.0",
+    "apollo-server": "^3.0.2",
     "async": "^3.1.0",
     "csv-parse": "^4.12.0",
+    "datasource-sql": "^1.4.1",
     "db-migrate": "^0.11.11",
     "db-migrate-pg": "^1.2.2",
     "dotenv": "^8.2.0",
     "email-validator": "^2.0.4",
-    "graphql": "^14.5.8",
-    "pg": "^7.14.0"
+    "graphql": "^15.5.1",
+    "pg": "^8.6.0"
   }
 }
