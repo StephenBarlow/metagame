@@ -48,7 +48,7 @@ const server = new ApolloServer({
         console.log('Server starting up');
       },
       requestDidStart() {
-        console.log('Operation received');
+        //console.log('Operation received');
       }
     }
   ]

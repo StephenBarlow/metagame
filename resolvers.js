@@ -9,7 +9,7 @@ const resolvers = {
   Query: {
     async user(parent, { email }, { dataSources }, info) {
       try {
-        const result = await dataSources.pg.getUser(email);
+        const result = await dataSources.pg.getUserByEmail(email);
         return result;
       } catch (err) {
         console.log(err.stack);
@@ -17,15 +17,20 @@ const resolvers = {
     },
     async league(parent, { leagueID }, { dataSources }, info) {
       try {
-        const result = await dataSources.pg.getLeague(leagueID);
+        const result = await dataSources.pg.getLeagueById(leagueID);
         return leagueFromRow(result);
       } catch (err) {
         console.log(err.stack);
       }
     },
-    async leagues(parent, { userEmail }, { dataSources }, info) {
+    async leagues(parent, { userID }, { dataSources }, info) {
       try {
-        const result = await dataSources.pg.getLeagues(userEmail);
+        let result;
+        if (userID) {
+          result = await dataSources.pg.getLeaguesForUser(userID);
+        } else {
+          result = await dataSources.pg.getAllLeagues();
+        }
         return result.map(function(row) {
           return leagueFromRow(row);
         });
@@ -185,23 +190,23 @@ const resolvers = {
     }
   },
   SportsGame: {
-    async awayTeam(game, args, { db }, info) {
+    async awayTeam(game, args, { dataSources }, info) {
       try {
-        const result = await db.query('SELECT * FROM teams WHERE short_name = $1 AND sports_league = $2 LIMIT 1', [game.awayTeamShortName, game.sportsLeague]);
-        return teamFromRow(result.rows[0]);
+        const result = await dataSources.pg.getTeam(game.awayTeamShortName, game.sportsLeague);
+        return teamFromRow(result);
       } catch (err) {
         console.log(err.stack);
       }
     },
-    async homeTeam(game, args, { db }, info) {
+    async homeTeam(game, args, { dataSources }, info) {
       try {
-        const result = await db.query('SELECT * FROM teams WHERE short_name = $1 LIMIT 1', [game.homeTeamShortName]);
-        return teamFromRow(result.rows[0]);
+        const result = await dataSources.pg.getTeam(game.homeTeamShortName, game.sportsLeague);
+        return teamFromRow(result);
       } catch (err) {
         console.log(err.stack);
       }
     },
-    async result(game, args, { db }, info) {
+    async result(game, args) {
       if (game.awayTeamScore === null || game.homeTeamScore === null) {
         return null;
       }
@@ -212,51 +217,80 @@ const resolvers = {
     }
   },
   FantasyLeague: {
-    async owner(league, args, { db }, info) {
-      const result = await db.query('SELECT users.*, memberships.display_name FROM users INNER JOIN memberships ON (users.id = memberships.user_id) WHERE memberships.league_id = $1 AND users.id = $2 LIMIT 1', [league.id, league.ownerID]);
-      return userFromRow(result.rows[0]);
+    async owner(league, args, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getLeagueOwner(league.id, league.ownerID);
+        return userFromRow(result);
+      } catch (err) {
+        console.log(err.stack);
+      }
     },
-    async users(league, args, { db }, info) {
-      const result = await db.query('SELECT users.*, memberships.display_name FROM users INNER JOIN memberships ON (users.id = memberships.user_id) WHERE memberships.league_id = $1', [league.id]);
-      return result.rows.map(function(row) {
-        return userFromRow(row);
-      });
+    async users(league, args, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getLeagueMembers(league.id);
+        return result.map(function(row) {
+          return userFromRow(row);
+        });
+      } catch (err) {
+        console.log(err.stack);
+      }
     },
-    async picks(league, args, { db }, info) {
-      const result = await db.query('SELECT * FROM picks WHERE league_id = $1', [league.id]);
-      return result.rows.map(function(row) {
-        return pickFromRow(row);
-      });
+    async picks(league, args, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getPicksForLeague(league.id);
+        return result.map(function(row) {
+          return pickFromRow(row);
+        });
+      } catch (err) {
+        console.log(err.stack);
+      }
     }
   },
   Pick: {
-    async user(pick, args, { db }, info) {
-      const result = await db.query('SELECT users.*, memberships.display_name FROM users INNER JOIN memberships ON (users.id = memberships.user_id) WHERE memberships.league_id = $1 AND users.id = $2 LIMIT 1', [pick.leagueID, pick.userID]);
-      return userFromRow(result.rows[0]);
+    async user(pick, args, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getUserById(pick.userID);
+        return result;
+      } catch (err) {
+        console.log(err.stack);
+      }
     },
-    async league(pick, args, { db }, info) {
-      const result = await db.query('SELECT * FROM fantasy_leagues WHERE id = $1 LIMIT 1', [pick.leagueID]);
-      return leagueFromRow(result.rows[0]);
+    async league(pick, args, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getLeagueById(pick.leagueID);
+        return leagueFromRow(result);
+      } catch (err) {
+        console.log(err.stack);
+      }
     },
-    async team(pick, args, { db }, info) {
-      const result = await db.query('SELECT * FROM sports_teams WHERE id = $1 LIMIT 1', [pick.teamID]);
-      return teamFromRow(result.rows[0]);
+    async team(pick, args, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getTeamById(pick.teamID);
+        return teamFromRow(result);
+      } catch (err) {
+        console.log(err.stack);
+      }
     },
   },
   User: {
-    async fantasyLeagues(user, args, { db }, info) {
-      const result = await db.query('SELECT fantasy_leagues.* FROM fantasy_leagues INNER JOIN memberships ON (fantasy_leagues.id = memberships.league_id) WHERE memberships.user_id = $1', [user.id]);
-      return result.rows.map(function(row) {
-        return leagueFromRow(row);
-      });
+    async fantasyLeagues(user, args, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getLeaguesForUser(user.id);
+        return result.map(function(row) {
+          return leagueFromRow(row);
+        });
+      } catch (err) {
+        console.log(err.stack);
+      }
     },
 
-    async displayName(user, { leagueID }, { db }, info) {
-      const result = await db.query('SELECT display_name FROM memberships INNER JOIN fantasy_leagues ON (fantasy_leagues.id = memberships.league_id) WHERE memberships.user_id = $1 AND fantasy_leagues.id = $2 LIMIT 1', [user.id, leagueID]);
-      if (result.rows === 0) {
-        return null;
+    async displayName(user, { leagueID }, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getUserDisplayNameForLeague(user.id, leagueID);
+        return result.display_name;
+      } catch (err) {
+        console.log(err.stack);
       }
-      return result.rows[0].display_name;
     },
   }
 };
