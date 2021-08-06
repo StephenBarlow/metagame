@@ -41,7 +41,9 @@ const resolvers = {
     async sportsTeams(parent, args, { dataSources }, info) {
       try {
         const result = await dataSources.pg.getTeams();
-        return result;
+        return result.map(function(row) {
+          return teamFromRow(row);
+        });
       } catch (err) {
         console.log(err.stack);
       }
@@ -399,6 +401,7 @@ function leagueFromRow(row) {
     id: row.id,
     name: row.name,
     gameMode: row.game_mode,
+    currentWeek: parseInt(process.env.CURRENT_WEEK) || 1,
 
     // Not schema fields, but used by subresolvers
     ownerID: row.owner_id

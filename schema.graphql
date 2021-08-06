@@ -1,4 +1,5 @@
 type Pick {
+  id: ID!
   user: User!
   league: FantasyLeague!
   team: SportsTeam!
@@ -51,6 +52,7 @@ type FantasyLeague {
   users: [User!]
   picks: [Pick!]
   gameMode: GameMode!
+  currentWeek: Int!
 }
 
 input CreateFantasyLeagueRequest {
