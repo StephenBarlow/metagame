@@ -168,21 +168,26 @@ const resolvers = {
       }
     },
 
-    async submitPick(parent, { request }, { db }, info) {
-      if (validatePick(request)) {
-        const picks = registerPick(request);
+    async submitPick(parent, { request }, { dataSources }, info) {
+      if (validatePick(request, dataSources.pg)) {
+        const picks = await registerPick(request, dataSources.pg);
+        console.log(picks);
         if (!picks) {
           return {
-            picks: null,
+            pick: null,
             errors: [{
               code: GQL_UNKNOWN_ERROR,
               message: 'Storing the pick failed. Please retry.'
             }]
           };
+        } else { // Success!
+          return {
+            pick: picks
+          };
         }
       } else {
         return {
-          picks: null,
+          pick: null,
           errors: [{
             code: GQL_INVALID_INPUT,
             message: 'The submitted pick is invalid.'
@@ -297,73 +302,70 @@ const resolvers = {
   }
 };
 
-async function registerPick(pickRequest, db) {
+async function registerPick(pickRequest, pg) {
   const { leagueID } = pickRequest;
-  const result = await db.query('SELECT game_mode FROM fantasy_leagues WHERE id = $1 LIMIT 1', [leagueID]);
-  if (result.rows.length === 0){
-
-    // Fantasy league not found
-    return false;
-  } else if (result.rows[0].game_mode === 'PICK_TWO'){
-    return registerPickTwoPick(pickRequest, db);
-  } else {
-
-    // Unrecognized game mode
-    return false;
-  }
-}
-
-async function registerPickTwoPick(pickRequest, db) {
-  const { userID, leagueID, teamIDs, week } = pickRequest;
-  let responseRows = [];
 
   try {
+    const result = await pg.getLeagueById(leagueID);
+    if (!result) {
+      // Fantasy league not found
+      return false;
+    } else if (result.game_mode === 'PICK_TWO') {
+      return registerPickTwoPick(pickRequest, pg);
+    } else {
 
-    // Begin transaction
-    await db.query('BEGIN');
-
-    // Invalidate any existing picks for this week
-    await db.query('UPDATE picks SET invalidated_at=CURRENT_TIMESTAMP WHERE week = $1 AND invalidated_at IS NULL', [week]);
-
-    // Create a pick row for each team included in the pick
-    for (const teamID of teamIDs) {
-      const response = await db.query('INSERT INTO picks(league_id, user_id, team_id, week) VALUES ($1, $2, $3, $4)', [leagueID, userID, teamID, week]);
-      responseRows.push(response.rows[0]);
+      // Unrecognized game mode
+      return false;
     }
-
-    // Commit transaction
-    await db.query('COMMIT')
-  } catch (e) {
-    await db.query('ROLLBACK')
-    return false;
-  }
-
-  return responseRows;
-}
-
-async function validatePick(pickRequest, db) {
-  const { leagueID } = pickRequest;
-  const result = await db.query('SELECT game_mode FROM fantasy_leagues WHERE id = $1 LIMIT 1', [leagueID]);
-  if (result.rows.length === 0){
-
-    // Fantasy league not found
-    return false;
-  } else if (result.rows[0].game_mode === 'PICK_TWO'){
-    return validatePickTwoPick(pickRequest, db);
-  } else {
-
-    // Unrecognized game mode
+  } catch (err) {
+    console.log(err.stack);
     return false;
   }
 }
 
-async function validatePickTwoPick(pickRequest, db) {
+async function registerPickTwoPick(pickRequest, pg) {
   const { userID, leagueID, teamIDs, week } = pickRequest;
 
-  const pastPicks = await db.query('SELECT * FROM picks WHERE league_id = $1 AND user_id = $2 AND week != $3 AND invalidated_at IS NULL ', [leagueID, userID, week]);
+  try {
+    const result = await pg.submitPicks(userID, leagueID, teamIDs, week);
+    return result.map(function(row) {
+      return pickFromRow(row);
+    });
+  } catch (err) {
+    console.log(err.stack);
+  }
+}
 
+async function validatePick(pickRequest, pg) {
+  const { leagueID } = pickRequest;
+
+  try {
+    const result = await pg.getLeagueById(leagueID);
+    if (!result) {
+      return false;
+    } else if (result.game_mode === 'PICK_TWO') {
+      return validatePickTwoPick(pickRequest, pg);
+    } else {
+      return false;
+    }
+  } catch (err) {
+    console.log(err.stack);
+    return false;
+  }
+}
+
+async function validatePickTwoPick(pickRequest, pg) {
+  const { userID, leagueID, teamIDs, week } = pickRequest;
+
+  // Need two distinct teams
+  if (teamIDs.length !== 2 || teamIDs[0] === teamIDs[1]) {
+    return false;
+  }
+
+  const pastPicks = await pg.getPicksForMember(userID, leagueID, week);
+  
   // Check if any picked team has been picked before
-  for (const row of pastPicks.rows) {
+  for (const pick of pastPicks) {
     if (teamIDs.includes(row.team_id)) {
       // At least one of these teams has already been picked by this player
       return false;
@@ -378,6 +380,7 @@ async function validatePickTwoPick(pickRequest, db) {
 
 function pickFromRow(row) {
   return {
+    id: row.id,
     week: row.week,
     isInvalidated: !(row.invalidated_at === null),
 

@@ -101,7 +101,7 @@ class PGDB extends SQLDataSource {
   async getTeam(shortName, league) {
     const val = await this.knex
       .select('*')
-      .from('sports_teams')
+      .from('teams')
       .where({
         short_name: shortName,
         sports_league: league
@@ -116,7 +116,7 @@ class PGDB extends SQLDataSource {
   async getTeamById(teamID) {
     const val = await this.knex
       .select('*')
-      .from('sports_teams')
+      .from('teams')
       .where({
         id: teamID
       })
@@ -160,13 +160,66 @@ class PGDB extends SQLDataSource {
       .select('*')
       .from('picks')
       .where({
-        'league_id': leagueID
+        'league_id': leagueID,
+        'invalidated_at': null
       })
       .cache(MINUTE);
     return val;
   }
 
+  async getPicksForMember(userID, leagueID, week) {
+    const val = await this.knex
+      .select('*')
+      .from('picks')
+      .where({
+        'user_id': userID,
+        'league_id': leagueID,
+        'invalidated_at': null
+      })
+      .whereNot({
+        'week': week
+      })
+      .cache(MINUTE);
+    return val;
+  }
 
+  async submitPicks(userID, leagueID, teamIDs, week) {
+    let responseRows = [];
+    const knex = this.knex;
+    console.log(teamIDs);
+
+    // DB transaction
+    await knex.transaction(async function(trx) {
+      // First, invalidate any previous picks
+      // for the current week
+      await knex('picks')
+        .where({
+          'invalidated_at': null,
+          'week': week
+        })
+        .update({
+          'invalidated_at': trx.raw('CURRENT_TIMESTAMP')
+        })
+        .transacting(trx);
+       
+      // Then, insert the new picks
+      for (const teamID of teamIDs) {
+        const result =  await knex('picks')
+          .insert({
+            'league_id': leagueID,
+            'user_id': userID,
+            'team_id': teamID,
+            'week': week
+          })
+          .transacting(trx)
+          .returning('*');
+        responseRows.push(result[0]);
+      }
+    })
+
+    //console.log(responseRows);
+    return responseRows;
+  }
 }
 
 exports.DataSource = PGDB;
