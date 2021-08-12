@@ -1,9 +1,11 @@
 require('dotenv').config()
 
 const { ApolloServer } = require('apollo-server');
-const { connectionPool, DataSource } = require('./connection-pool')
-const { typeDefs } = require('./schema')
+const { connectionPool, DataSource } = require('./connection-pool');
+const { ApolloServerPluginLandingPageGraphQLPlayground } = require('apollo-server-core');
+const { typeDefs } = require('./schema');
 const { resolvers } = require('./resolvers');
+
 
 const PORT = process.env.PORT || 4000;
 
@@ -50,7 +52,21 @@ const server = new ApolloServer({
       requestDidStart() {
         //console.log('Operation received');
       }
-    }
+    },
+    ApolloServerPluginLandingPageGraphQLPlayground({
+      settings: {
+        'some.setting': true,
+        'general.betaUpdates': false,
+        'editor.theme': 'dark',
+        'editor.cursorShape': 'line',
+        'editor.reuseHeaders': true,
+        'tracing.hideTracingResponse': true,
+        'queryPlan.hideQueryPlanResponse': true,
+        'editor.fontSize': 18,
+        'editor.fontFamily': `'Consolas', 'Inconsolata', 'Droid Sans Mono', 'Monaco', monospace`,
+        'request.credentials': 'omit',
+      }
+    })
   ]
 });
 
