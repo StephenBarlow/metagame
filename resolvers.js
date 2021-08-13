@@ -51,7 +51,9 @@ const resolvers = {
     async sportsGames(parent, args, { dataSources }, info) {
       try {
         const result = await dataSources.pg.getSportsGames();
-        return result;
+        return result.map(function(row) {
+          return gameFromRow(row);
+        });
       } catch (err) {
         console.log(err.stack);
       }
@@ -171,7 +173,6 @@ const resolvers = {
     async submitPick(parent, { request }, { dataSources }, info) {
       if (validatePick(request, dataSources.pg)) {
         const picks = await registerPick(request, dataSources.pg);
-        console.log(picks);
         if (!picks) {
           return {
             pick: null,
@@ -215,9 +216,12 @@ const resolvers = {
     },
     async result(game, args) {
       if (game.awayTeamScore === null || game.homeTeamScore === null) {
-        return null;
+        return {
+          complete: false
+        };
       }
       return {
+        complete: true,
         awayTeamScore: game.awayTeamScore,
         homeTeamScore: game.homeTeamScore
       };

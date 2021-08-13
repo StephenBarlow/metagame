@@ -85,8 +85,9 @@ type SportsGame {
 }
 
 type SportsGameResult {
-  awayTeamScore: Int!
-  homeTeamScore: Int!
+  complete: Boolean!
+  awayTeamScore: Int
+  homeTeamScore: Int
 }
 
 input CreateSportsGameRequest {

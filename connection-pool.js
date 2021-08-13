@@ -3,6 +3,7 @@ const { SQLDataSource } = require('datasource-sql');
 
 const HOUR = 3600;
 const MINUTE = 60;
+const NOTHING = 1;
 
 class PGDB extends SQLDataSource {
   async getTeams() {
@@ -17,7 +18,7 @@ class PGDB extends SQLDataSource {
     const val = await this.knex
       .select('*')
       .from('sports_games')
-      .cache(HOUR);
+      .cache(NOTHING);
     return val;
   }
 
@@ -186,7 +187,6 @@ class PGDB extends SQLDataSource {
   async submitPicks(userID, leagueID, teamIDs, week) {
     let responseRows = [];
     const knex = this.knex;
-    console.log(teamIDs);
 
     // DB transaction
     await knex.transaction(async function(trx) {
@@ -217,7 +217,6 @@ class PGDB extends SQLDataSource {
       }
     })
 
-    //console.log(responseRows);
     return responseRows;
   }
 }
