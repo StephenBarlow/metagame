@@ -1,6 +1,11 @@
 {
   "prod": {
-    "ENV": "DATABASE_URL"
+    "overwrite": {
+      "driver": "pg",
+      "ssl": {
+        "rejectUnauthorized": false
+      }
+    }
   },
   "dev": {
     "driver": "pg",
