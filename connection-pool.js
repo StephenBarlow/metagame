@@ -156,7 +156,7 @@ class PGDB extends SQLDataSource {
     return val;
   }
 
-  async getPicksForLeague(leagueID) {
+  async getPicksForLeague(leagueID, week) {
     const val = await this.knex
       .select('*')
       .from('picks')
@@ -164,7 +164,22 @@ class PGDB extends SQLDataSource {
         'league_id': leagueID,
         'invalidated_at': null
       })
+      .whereRaw('week <= ?', [week])
       .cache(MINUTE);
+    return val;
+  }
+
+  async getCurrentPick(leagueID, userID, week) {
+    const val = await this.knex
+      .select('*')
+      .from('picks')
+      .where({
+        'user_id': userID,
+        'league_id': leagueID,
+        'week': week,
+        'invalidated_at': null
+      })
+      .cache(NOTHING);
     return val;
   }
 

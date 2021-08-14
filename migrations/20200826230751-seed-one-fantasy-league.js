@@ -24,13 +24,13 @@ exports.up = async function(db) {
   await db.insert('fantasy_leagues', [
     'owner_id', 'name', 'game_mode'
   ], [
-    1, 'Pick 2 2020', 'PICK_TWO'
+    1, 'Pick 2 2021', 'PICK_TWO'
   ]);
 
   await db.insert('memberships', [
     'user_id', 'league_id', 'display_name'
   ], [
-    1, 1, 'Test User'
+    1, 1, 'Stephen'
   ]);
 
   return null;

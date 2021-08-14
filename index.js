@@ -35,7 +35,6 @@ if (databaseURL) {
     port: process.env.PGPORT,
     password: ''
   }
-  console.log(knexConfig);
 }
 
 const pg = new DataSource(knexConfig);
@@ -48,9 +47,6 @@ const server = new ApolloServer({
     {
       serverWillStart() {
         console.log('Server starting up');
-      },
-      requestDidStart() {
-        //console.log('Operation received');
       }
     },
     ApolloServerPluginLandingPageGraphQLPlayground({

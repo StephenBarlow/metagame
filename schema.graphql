@@ -53,6 +53,7 @@ type FantasyLeague {
   picks: [Pick!]
   gameMode: GameMode!
   currentWeek: Int!
+  revealedWeek: Int!
 }
 
 input CreateFantasyLeagueRequest {
@@ -106,9 +107,9 @@ type CreateSportsGameResponse {
 
 type Query {
   user(email: String!): User
-  league(leagueID: ID): FantasyLeague
+  league(leagueID: ID!): FantasyLeague
   leagues(userID: String): [FantasyLeague!]
-  picks(leagueID: ID!, userID: ID, week: Int): [Pick!]
+  currentPick(leagueID: ID!, userID: ID!): [Pick!]
   sportsTeams(league: SportsLeague): [SportsTeam!]
   sportsGames(league: SportsLeague, season: String, week: Int): [SportsGame!]
 }

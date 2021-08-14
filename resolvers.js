@@ -57,6 +57,16 @@ const resolvers = {
       } catch (err) {
         console.log(err.stack);
       }
+    },
+    async currentPick(parent, {leagueID, userID}, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getCurrentPick(leagueID, userID, parseInt(process.env.CURRENT_WEEK));
+        return result.map(function(row) {
+          return pickFromRow(row);
+        });
+      } catch (err) {
+        console.log(err.stack);
+      }
     }
   },
   Mutation: {
@@ -248,7 +258,7 @@ const resolvers = {
     },
     async picks(league, args, { dataSources }, info) {
       try {
-        const result = await dataSources.pg.getPicksForLeague(league.id);
+        const result = await dataSources.pg.getPicksForLeague(league.id, parseInt(process.env.REVEALED_WEEK));
         return result.map(function(row) {
           return pickFromRow(row);
         });
@@ -409,6 +419,7 @@ function leagueFromRow(row) {
     name: row.name,
     gameMode: row.game_mode,
     currentWeek: parseInt(process.env.CURRENT_WEEK) || 1,
+    revealedWeek: parseInt(process.env.REVEALED_WEEK) || 1,
 
     // Not schema fields, but used by subresolvers
     ownerID: row.owner_id
