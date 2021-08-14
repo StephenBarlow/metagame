@@ -9,23 +9,15 @@ const { resolvers } = require('./resolvers');
 
 const PORT = process.env.PORT || 4000;
 
-let databaseURL = null;
-if (process.env.DATABASE_URL) {
-  databaseURL = new URL(process.env.DATABASE_URL);
-}
-
 let knexConfig = {
   client: "pg",
   version: "13.3"
 };
 
-if (databaseURL) {
+if (process.env.DATABASE_URL) {
   knexConfig.connection = {
-    user: databaseURL.username,
-    host: databaseURL.hostname,
-    database: databaseURL.pathname.split('/')[1],
-    password: databaseURL.password,
-    port: databaseURL.port,
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
   };
 } else {
   knexConfig.connection = {
