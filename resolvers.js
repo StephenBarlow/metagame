@@ -419,7 +419,7 @@ function leagueFromRow(row) {
     name: row.name,
     gameMode: row.game_mode,
     currentWeek: parseInt(process.env.CURRENT_WEEK) || 1,
-    revealedWeek: parseInt(process.env.REVEALED_WEEK) || 1,
+    revealedWeek: parseInt(process.env.REVEALED_WEEK) || 0,
 
     // Not schema fields, but used by subresolvers
     ownerID: row.owner_id
