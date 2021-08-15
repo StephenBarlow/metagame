@@ -1,9 +1,12 @@
 const emailValidator = require('email-validator');
+const { assertDirective } = require('graphql');
 
 const PG_UNIQUE_VIOLATION = '23505';
 const GQL_UNKNOWN_ERROR = 'ERR_UNKNOWN'
 const GQL_UNIQUE_VIOLATION = 'ERR_DUPLICATE';
 const GQL_INVALID_INPUT = 'ERR_INVALID_INPUT'
+const BYE = -1;
+const BYE_LIMIT = 4;
 
 const resolvers = {
   Query: {
@@ -181,7 +184,8 @@ const resolvers = {
     },
 
     async submitPick(parent, { request }, { dataSources }, info) {
-      if (validatePick(request, dataSources.pg)) {
+      const validPick = await validatePick(request, dataSources.pg);
+      if (validPick) {
         const picks = await registerPick(request, dataSources.pg);
         if (!picks) {
           return {
@@ -201,9 +205,9 @@ const resolvers = {
           pick: null,
           errors: [{
             code: GQL_INVALID_INPUT,
-            message: 'The submitted pick is invalid.'
+            message: 'Invalid pick'
           }]
-        }
+        };
       }
     }
   },
@@ -358,7 +362,7 @@ async function validatePick(pickRequest, pg) {
     if (!result) {
       return false;
     } else if (result.game_mode === 'PICK_TWO') {
-      return validatePickTwoPick(pickRequest, pg);
+      return await validatePickTwoPick(pickRequest, pg);
     } else {
       return false;
     }
@@ -371,18 +375,37 @@ async function validatePick(pickRequest, pg) {
 async function validatePickTwoPick(pickRequest, pg) {
   const { userID, leagueID, teamIDs, week } = pickRequest;
 
-  // Need two distinct teams
-  if (teamIDs.length !== 2 || teamIDs[0] === teamIDs[1]) {
+  // Need exactly two teams
+  if (teamIDs.length !== 2) {
+    return false;
+  }
+  
+  // Can't double-pick a team (unless BYE)
+  if (teamIDs[0] === teamIDs[1] && teamIDs[0] !== BYE) {
+    return false;
+  }
+
+  // Can't pick BYE plus an actual team
+  if (teamIDs[0] !== teamIDs[1] && teamIDs.includes(BYE)) {
     return false;
   }
 
   const pastPicks = await pg.getPicksForMember(userID, leagueID, week);
   
   // Check if any picked team has been picked before
+  let bye_count = 0;
   for (const pick of pastPicks) {
     if (teamIDs.includes(row.team_id)) {
-      // At least one of these teams has already been picked by this player
-      return false;
+      // Check if BYE limit is already reached
+      if (teamIDs.includes(BYE)){
+        bye_count += 1;
+        if (bye_count === BYE_LIMIT) {
+          return false;
+        }
+      } else {
+        // At least one of these teams has already been picked by this player
+        return false;
+      }
     }
   }
 
