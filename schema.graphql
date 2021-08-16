@@ -54,6 +54,7 @@ type FantasyLeague {
   gameMode: GameMode!
   currentWeek: Int!
   revealedWeek: Int!
+  season: String!
 }
 
 input CreateFantasyLeagueRequest {

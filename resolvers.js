@@ -441,6 +441,7 @@ function leagueFromRow(row) {
     id: row.id,
     name: row.name,
     gameMode: row.game_mode,
+    season: row.season,
     currentWeek: parseInt(process.env.CURRENT_WEEK) || 1,
     revealedWeek: parseInt(process.env.REVEALED_WEEK) || 0,
 
