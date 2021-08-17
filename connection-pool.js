@@ -18,7 +18,19 @@ class PGDB extends SQLDataSource {
     const val = await this.knex
       .select('*')
       .from('sports_games')
-      .cache(NOTHING);
+      .cache(MINUTE);
+    return val;
+  }
+
+  async getSportsGamesForWeek(season, week) {
+    const val = await this.knex
+      .select('*')
+      .from('sports_games')
+      .where({
+        season: season,
+        week: week
+      })
+      .cache(MINUTE);
     return val;
   }
 
@@ -93,7 +105,7 @@ class PGDB extends SQLDataSource {
       .where({
         'id': leagueID
       })
-      .cache(HOUR);
+      .cache(MINUTE);
     if (val.length) {
       return val[0];
     }

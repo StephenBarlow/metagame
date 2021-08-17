@@ -163,7 +163,7 @@ const resolvers = {
       } catch (error) {
         let gqlError = {
           code: GQL_UNKNOWN_ERROR,
-          message: 'An unkonwn error occurred'
+          message: 'An unknown error occurred'
         }
 
         const errorCode = error.code;
@@ -183,8 +183,9 @@ const resolvers = {
       }
     },
 
-    async submitPick(parent, { request }, { dataSources }, info) {
-      const validPick = await validatePick(request, dataSources.pg);
+    async submitPick(parent, { request }, context, info) {
+      const dataSources = context.dataSources;
+      const validPick = await validatePick(request, dataSources.pg, context);
       if (validPick) {
         const picks = await registerPick(request, dataSources.pg);
         if (!picks) {
@@ -205,7 +206,7 @@ const resolvers = {
           pick: null,
           errors: [{
             code: GQL_INVALID_INPUT,
-            message: 'Invalid pick'
+            message: context.errorMessage
           }]
         };
       }
@@ -354,7 +355,7 @@ async function registerPickTwoPick(pickRequest, pg) {
   }
 }
 
-async function validatePick(pickRequest, pg) {
+async function validatePick(pickRequest, pg, context) {
   const { leagueID } = pickRequest;
 
   try {
@@ -362,7 +363,7 @@ async function validatePick(pickRequest, pg) {
     if (!result) {
       return false;
     } else if (result.game_mode === 'PICK_TWO') {
-      return await validatePickTwoPick(pickRequest, pg);
+      return await validatePickTwoPick(pickRequest, pg, context);
     } else {
       return false;
     }
@@ -372,22 +373,53 @@ async function validatePick(pickRequest, pg) {
   }
 }
 
-async function validatePickTwoPick(pickRequest, pg) {
+async function validatePickTwoPick(pickRequest, pg, context) {
   const { userID, leagueID, teamIDs, week } = pickRequest;
 
   // Need exactly two teams
   if (teamIDs.length !== 2) {
+    context.errorMessage = 'Must select exactly two teams';
     return false;
   }
   
   // Can't double-pick a team (unless BYE)
   if (teamIDs[0] === teamIDs[1] && teamIDs[0] !== BYE) {
+    context.errorMessage = 'Must select two different teams (unless BYE)';
     return false;
   }
 
   // Can't pick BYE plus an actual team
   if (teamIDs[0] !== teamIDs[1] && teamIDs.includes(BYE)) {
+    context.errorMessage = "Can't select one team and BYE";
     return false;
+  }
+
+  // Get all games for this week
+  const weekGames = await pg.getSportsGamesForWeek(process.env.CURRENT_SEASON, week);
+  const allTeams = await pg.getTeams();
+
+  // Make sure both picked teams have games this week
+  let pickedGames = [];
+  for (const teamID of teamIDs) {
+    if (teamID === BYE) break;
+    const currentTeam = allTeams.find(team => team.id === parseInt(teamID));
+    const hasGame = weekGames.find(game => (game.away_team_short_name === currentTeam.short_name || game.home_team_short_name === currentTeam.short_name));
+    if (hasGame) {
+      pickedGames.push(hasGame);
+    } else {
+      context.errorMessage = `Team ${currentTeam.short_name} does not appear to have a game this week! If this is incorrect, please email Stephen to make your pick.`
+      return false;
+    }
+  }
+
+  // Make sure neither game has already started
+  const now = new Date();
+  for (const game of pickedGames) {
+    const gameDate = new Date(game.start_time);
+    if (gameDate < now) {
+      context.errorMessage = 'At least one selected game appears to have already started! If this is incorrect, please email Stephen to make your pick.'
+      return false;
+    }
   }
 
   const pastPicks = await pg.getPicksForMember(userID, leagueID, week);
@@ -395,21 +427,21 @@ async function validatePickTwoPick(pickRequest, pg) {
   // Check if any picked team has been picked before
   let bye_count = 0;
   for (const pick of pastPicks) {
-    if (teamIDs.includes(row.team_id)) {
+    if (teamIDs.includes(pick.team_id)) {
       // Check if BYE limit is already reached
       if (teamIDs.includes(BYE)){
         bye_count += 1;
         if (bye_count === BYE_LIMIT) {
+          context.errorMessage = 'You have already used all byes this season!'
           return false;
         }
       } else {
         // At least one of these teams has already been picked by this player
+        context.errorMessage = 'You have already picked at least one of these teams! If this is incorrect, please email Stephen to make your pick.'
         return false;
       }
     }
   }
-
-  // TODO: Make sure the picked team has a game in the specified week
 
   // Looks like a valid pick
   return true;
