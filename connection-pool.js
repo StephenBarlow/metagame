@@ -27,8 +27,8 @@ class PGDB extends SQLDataSource {
       .select('*')
       .from('sports_games')
       .where({
-        season: season,
-        week: week
+        'season': season,
+        'week': week
       })
       .cache(MINUTE);
     return val;
