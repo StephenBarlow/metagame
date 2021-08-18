@@ -222,7 +222,8 @@ class PGDB extends SQLDataSource {
       await knex('picks')
         .where({
           'invalidated_at': null,
-          'week': week
+          'week': week,
+          'user_id': userID
         })
         .update({
           'invalidated_at': trx.raw('CURRENT_TIMESTAMP')

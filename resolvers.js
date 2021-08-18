@@ -470,7 +470,9 @@ function userFromRow(row) {
 
 function leagueFromRow(row) {
   return {
-    id: row.id,
+    // Sometimes the row is a MEMBERSHIP JOIN,
+    // not a LEAGUE
+    id: (row.league_id ? row.league_id : row.id),
     name: row.name,
     gameMode: row.game_mode,
     season: row.season,
