@@ -177,7 +177,7 @@ class PGDB extends SQLDataSource {
         'invalidated_at': null
       })
       .whereRaw('week <= ?', [week])
-      .cache(MINUTE);
+      .cache(NOTHING);
     return val;
   }
 
