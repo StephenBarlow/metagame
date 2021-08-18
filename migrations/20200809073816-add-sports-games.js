@@ -37,7 +37,7 @@ exports.up = function(db) {
       type: 'int'
     },
     start_time: {
-      type: 'timestamp',
+      type: 'timestamp with time zone',
       notNull: true
     },
     season: {
