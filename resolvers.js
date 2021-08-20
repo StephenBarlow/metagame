@@ -12,7 +12,7 @@ const resolvers = {
   Query: {
     async user(parent, { email }, { dataSources }, info) {
       try {
-        const result = await dataSources.pg.getUserByEmail(email);
+        const result = await dataSources.pg.getUserByEmail(email.toLowerCase());
         return result;
       } catch (err) {
         console.log(err.stack);
