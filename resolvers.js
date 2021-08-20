@@ -422,12 +422,12 @@ async function validatePickTwoPick(pickRequest, pg, context) {
     }
   }
 
-  const pastPicks = await pg.getPicksForMember(userID, leagueID, week);
+  const pastPicks = await pg.getPicksForMember(userID, leagueID);
   
   // Check if any picked team has been picked before
   let bye_count = 0;
   for (const pick of pastPicks) {
-    if (teamIDs.includes(pick.team_id)) {
+    if (teamIDs.includes(pick.team_id) && pick.week !== week) {
       // Check if BYE limit is already reached
       if (teamIDs.includes(BYE)){
         bye_count += 1;
@@ -439,6 +439,29 @@ async function validatePickTwoPick(pickRequest, pg, context) {
         // At least one of these teams has already been picked by this player
         context.errorMessage = 'You have already picked at least one of these teams! If this is incorrect, please email Stephen to make your pick.'
         return false;
+      }
+    }
+  }
+
+  // Check if this player previously picked a team
+  // this week that already started their game
+  const thisWeekPicks = pastPicks.filter(pick => (pick.week === week));
+  if (thisWeekPicks) {
+    let pickedTeams = [];
+    for (const pick of thisWeekPicks) {
+      pickedTeams.push(allTeams.find(team => team.id === pick.team_id));
+    }
+
+    // Get the two games for the two teams from this
+    // player's previous submission
+    for (const pickedTeam of pickedTeams) {
+      const pickedGame = weekGames.find(game => (game.away_team_short_name === pickedTeam.short_name || game.home_team_short_name === pickedTeam.short_name));
+      if (pickedGame) {
+        const gameDate = new Date(pickedGame.start_time);
+        if (gameDate < now) {
+          context.errorMessage = 'At least one team from your PREVIOUS submission has already started their game. If this is incorrect, please email Stephen to make your pick.'
+          return false;
+        }
       }
     }
   }
