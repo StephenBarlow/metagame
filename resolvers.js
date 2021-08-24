@@ -51,12 +51,10 @@ const resolvers = {
         console.log(err.stack);
       }
     },
-    async sportsGames(parent, args, { dataSources }, info) {
+    async sportsGames(parent, { season }, { dataSources }, info) {
       try {
-        const result = await dataSources.pg.getSportsGames();
-        return result.map(function(row) {
-          return gameFromRow(row);
-        });
+        const result = await dataSources.pg.getSportsGames(season ? season : process.env.CURRENT_SEASON);
+        return gamesFromRows(result);
       } catch (err) {
         console.log(err.stack);
       }
@@ -516,19 +514,21 @@ function teamFromRow(row) {
   };
 }
 
-function gameFromRow(row) {
-  return {
-    id: row.id,
-    sportsLeague: row.sports_league,
-    startsAt: row.start_time,
-    week: row.week,
+function gamesFromRows(rows) {
+  return rows.map(function(row) {
+    return {
+      id: row.id,
+      sportsLeague: row.sports_league,
+      startsAt: row.start_time,
+      week: row.week,
 
-    // Not schema fields, but used by subresolvers
-    awayTeamShortName: row.away_team_short_name,
-    homeTeamShortName: row.home_team_short_name,
-    awayTeamScore: row.away_team_score,
-    homeTeamScore: row.home_team_score
-  };
+      // Not schema fields, but used by subresolvers
+      awayTeamShortName: row.away_team_short_name,
+      homeTeamShortName: row.home_team_short_name,
+      awayTeamScore: row.away_team_score,
+      homeTeamScore: row.home_team_score
+    };
+  });
 }
 
 exports.resolvers = resolvers;

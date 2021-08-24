@@ -14,10 +14,13 @@ class PGDB extends SQLDataSource {
     return val;
   }
 
-  async getSportsGames() {
+  async getSportsGames(season) {
     const val = await this.knex
       .select('*')
       .from('sports_games')
+      .where({
+        'season': season
+      })
       .cache(MINUTE);
     return val;
   }
