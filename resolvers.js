@@ -5,7 +5,7 @@ const PG_UNIQUE_VIOLATION = '23505';
 const GQL_UNKNOWN_ERROR = 'ERR_UNKNOWN'
 const GQL_UNIQUE_VIOLATION = 'ERR_DUPLICATE';
 const GQL_INVALID_INPUT = 'ERR_INVALID_INPUT'
-const BYE = -1;
+const BYE = '-1';
 const BYE_LIMIT = 4;
 
 const resolvers = {
@@ -288,6 +288,14 @@ const resolvers = {
       }
     },
     async team(pick, args, { dataSources }, info) {
+      if (pick.teamID === -1) {
+        return {
+          id: 'bye',
+          name: 'BYE',
+          shortName: 'BYE',
+          sportsLeague: 'NFL'
+        };
+      }
       try {
         const result = await dataSources.pg.getTeamById(pick.teamID);
         return teamFromRow(result);
@@ -425,7 +433,7 @@ async function validatePickTwoPick(pickRequest, pg, context) {
   // Check if any picked team has been picked before
   let bye_count = 0;
   for (const pick of pastPicks) {
-    if (teamIDs.includes(pick.team_id) && pick.week !== week) {
+    if (teamIDs.includes(pick.team_id.toString()) && pick.week !== week) {
       // Check if BYE limit is already reached
       if (teamIDs.includes(BYE)){
         bye_count += 1;
