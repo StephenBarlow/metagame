@@ -387,7 +387,7 @@ async function validatePickTwoPick(pickRequest, pg, context) {
     context.errorMessage = 'Must select exactly two teams';
     return false;
   }
-  
+
   // Can't double-pick a team (unless BYE)
   if (teamIDs[0] === teamIDs[1] && teamIDs[0] !== BYE) {
     context.errorMessage = 'Must select two different teams (unless BYE)';
@@ -429,7 +429,7 @@ async function validatePickTwoPick(pickRequest, pg, context) {
   }
 
   const pastPicks = await pg.getPicksForMember(userID, leagueID);
-  
+
   // Check if any picked team has been picked before
   let bye_count = 0;
   for (const pick of pastPicks) {
@@ -523,8 +523,10 @@ function teamFromRow(row) {
 }
 
 function gamesFromRows(rows) {
-  return rows.map(function(row) {
-    return {
+  let games = [];
+
+  for (const row of rows) {
+    games.push({
       id: row.id,
       sportsLeague: row.sports_league,
       startsAt: row.start_time,
@@ -535,8 +537,10 @@ function gamesFromRows(rows) {
       homeTeamShortName: row.home_team_short_name,
       awayTeamScore: row.away_team_score,
       homeTeamScore: row.home_team_score
-    };
-  });
+    });
+  }
+
+  return games;
 }
 
 exports.resolvers = resolvers;
