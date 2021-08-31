@@ -25,8 +25,8 @@ exports.up = async function(db) {
       'season',
       'week',
       'start_time',
-      'home_team_short_name',
-      'away_team_short_name'
+      'away_team_short_name',
+      'home_team_short_name'
     ], [
       2020,
       game[0],
