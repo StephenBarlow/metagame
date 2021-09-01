@@ -74,6 +74,7 @@ const resolvers = {
     }
   },
   Mutation: {
+    /*
     async createFantasyLeague(parent, args, context, info) {
       const client = await connectionPool.connect();
       try {
@@ -182,7 +183,7 @@ const resolvers = {
       } finally {
         client.release();
       }
-    },
+    },*/
 
     async submitPick(parent, { request }, context, info) {
       const dataSources = context.dataSources;

@@ -116,11 +116,11 @@ type Query {
 }
 
 type Mutation {
-  createUser(request: CreateUserRequest!): CreateUserResponse
-  createFantasyLeague(request: CreateFantasyLeagueRequest!): CreateFantasyLeagueResponse
-  addUserToFantasyLeague(request: AddUserToFantasyLeagueRequest!): AddUserToFantasyLeagueResponse
+  #createUser(request: CreateUserRequest!): CreateUserResponse
+  #createFantasyLeague(request: CreateFantasyLeagueRequest!): CreateFantasyLeagueResponse
+  #addUserToFantasyLeague(request: AddUserToFantasyLeagueRequest!): AddUserToFantasyLeagueResponse
   submitPick(request: SubmitPickRequest!): SubmitPickResponse
-  createSportsGame(request: CreateSportsGameRequest!): CreateSportsGameResponse
+  #createSportsGame(request: CreateSportsGameRequest!): CreateSportsGameResponse
 }
 
 type Error {
