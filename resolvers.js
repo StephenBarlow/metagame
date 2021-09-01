@@ -53,8 +53,11 @@ const resolvers = {
     },
     async sportsGames(parent, { season }, { dataSources }, info) {
       try {
-        const result = await dataSources.pg.getSportsGames(season ? season : process.env.CURRENT_SEASON);
-        return gamesFromRows(result);
+        let [result, allTeams] = await Promise.all([
+          dataSources.pg.getSportsGames(season ? season : process.env.CURRENT_SEASON),
+          dataSources.pg.getTeams()
+        ]);
+        return gamesFromRows(result, allTeams);
       } catch (err) {
         console.log(err.stack);
       }
@@ -211,22 +214,6 @@ const resolvers = {
     }
   },
   SportsGame: {
-    async awayTeam(game, args, { dataSources }, info) {
-      try {
-        const result = await dataSources.pg.getTeam(game.awayTeamShortName, game.sportsLeague);
-        return teamFromRow(result);
-      } catch (err) {
-        console.log(err.stack);
-      }
-    },
-    async homeTeam(game, args, { dataSources }, info) {
-      try {
-        const result = await dataSources.pg.getTeam(game.homeTeamShortName, game.sportsLeague);
-        return teamFromRow(result);
-      } catch (err) {
-        console.log(err.stack);
-      }
-    },
     async result(game, args) {
       if (game.awayTeamScore === null || game.homeTeamScore === null) {
         return {
@@ -522,19 +509,22 @@ function teamFromRow(row) {
   };
 }
 
-function gamesFromRows(rows) {
+function gamesFromRows(rows, allTeams) {
   let games = [];
 
   for (const row of rows) {
+    const awayTeam = allTeams.find(team => row.away_team_short_name === team.short_name);
+    const homeTeam = allTeams.find(team => row.home_team_short_name === team.short_name);
+
     games.push({
       id: row.id,
       sportsLeague: row.sports_league,
       startsAt: row.start_time,
       week: row.week,
+      awayTeam: teamFromRow(awayTeam),
+      homeTeam: teamFromRow(homeTeam),
 
       // Not schema fields, but used by subresolvers
-      awayTeamShortName: row.away_team_short_name,
-      homeTeamShortName: row.home_team_short_name,
       awayTeamScore: row.away_team_score,
       homeTeamScore: row.home_team_score
     });
