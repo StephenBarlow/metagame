@@ -449,6 +449,12 @@ async function validatePickTwoPick(pickRequest, pg, context) {
     // Get the two games for the two teams from this
     // player's previous submission
     for (const pickedTeam of pickedTeams) {
+
+      // This player's previous pick was to take a bye
+      if (!pickedTeam) {
+        break;
+      }
+
       const pickedGame = weekGames.find(game => (game.away_team_short_name === pickedTeam.short_name || game.home_team_short_name === pickedTeam.short_name));
       if (pickedGame) {
         const gameDate = new Date(pickedGame.start_time);
