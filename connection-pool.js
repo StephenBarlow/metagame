@@ -167,7 +167,7 @@ class PGDB extends SQLDataSource {
       .where({
         'memberships.league_id': leagueID
       })
-      .cache(MINUTE);
+      .cache(HOUR);
     return val;
   }
 
@@ -180,7 +180,7 @@ class PGDB extends SQLDataSource {
         'invalidated_at': null
       })
       .whereRaw('week <= ?', [week])
-      .cache(NOTHING);
+      .cache(MINUTE);
     return val;
   }
 
@@ -229,7 +229,7 @@ class PGDB extends SQLDataSource {
           'invalidated_at': trx.raw('CURRENT_TIMESTAMP')
         })
         .transacting(trx);
-       
+
       // Then, insert the new picks
       for (const teamID of teamIDs) {
         const result =  await knex('picks')
