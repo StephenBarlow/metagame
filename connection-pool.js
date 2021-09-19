@@ -45,7 +45,7 @@ class PGDB extends SQLDataSource {
         'email': email
       })
       .limit(1)
-      .cache(MINUTE);
+      .cache(HOUR);
     if (val.length) {
       return val[0];
     }
@@ -59,7 +59,7 @@ class PGDB extends SQLDataSource {
         'id': id
       })
       .limit(1)
-      .cache(MINUTE);
+      .cache(HOUR);
     if (val.length) {
       return val[0];
     }

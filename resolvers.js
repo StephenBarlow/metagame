@@ -261,8 +261,8 @@ const resolvers = {
   Pick: {
     async user(pick, args, { dataSources }, info) {
       try {
-        const result = await dataSources.pg.getUserById(pick.userID);
-        return result;
+        const result = await dataSources.pg.getLeagueMembers(pick.leagueID);
+        return userFromRow(result.find(user => user.id === pick.userID));
       } catch (err) {
         console.log(err.stack);
       }
@@ -285,8 +285,9 @@ const resolvers = {
         };
       }
       try {
-        const result = await dataSources.pg.getTeamById(pick.teamID);
-        return teamFromRow(result);
+        // Get ALL NFL teams every time and hit cache most times
+        const result = await dataSources.pg.getTeams();
+        return teamFromRow(result.find(row => row.id === pick.teamID));
       } catch (err) {
         console.log(err.stack);
       }
@@ -305,6 +306,12 @@ const resolvers = {
     },
 
     async displayName(user, { leagueID }, { dataSources }, info) {
+
+      // Don't bother with db query if we already have the data
+      if (user.displayName) {
+        return user.displayName;
+      }
+
       try {
         const result = await dataSources.pg.getUserDisplayNameForLeague(user.id, leagueID);
         return result.display_name;
