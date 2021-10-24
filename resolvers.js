@@ -19,13 +19,15 @@ const resolvers = {
       }
     },
     async league(parent, { leagueID }, context, info) {
-      let [league, picks, users] = await Promise.all([
+      let [league, picks, users, teams] = await Promise.all([
         context.dataSources.pg.getLeagueById(leagueID),
         context.dataSources.pg.getPicksForLeague(leagueID, parseInt(process.env.REVEALED_WEEK)),
-        context.dataSources.pg.getLeagueMembers(leagueID)
+        context.dataSources.pg.getLeagueMembers(leagueID),
+        context.dataSources.pg.getTeams()
       ]);
       context.picks = picks;
       context.users = users;
+      context.teams = teams;
       return leagueFromRow(league);
     },
     async leagues(parent, { userID }, { dataSources }, info) {
@@ -150,12 +152,16 @@ const resolvers = {
     }
   },
   Pick: {
-    async user(pick, args, { dataSources }, info) {
-      try {
-        const result = await dataSources.pg.getLeagueMembers(pick.leagueID);
-        return userFromRow(result.find(user => user.id === pick.userID));
-      } catch (err) {
-        console.log(err.stack);
+    async user(pick, args, context, info) {
+      if (context.users) {
+        return userFromRow(context.users.find(user => user.id === pick.userID));
+      } else {
+        try {
+          const result = await context.dataSources.pg.getLeagueMembers(pick.leagueID);
+          return userFromRow(result.find(user => user.id === pick.userID));
+        } catch (err) {
+          console.log(err.stack);
+        }
       }
     },
     async league(pick, args, { dataSources }, info) {
@@ -166,7 +172,7 @@ const resolvers = {
         console.log(err.stack);
       }
     },
-    async team(pick, args, { dataSources }, info) {
+    async team(pick, args, context, info) {
       if (pick.teamID === -1) {
         return {
           id: 'bye',
@@ -175,12 +181,15 @@ const resolvers = {
           sportsLeague: 'NFL'
         };
       }
-      try {
-        // Get ALL NFL teams every time and hit cache most times
-        const result = await dataSources.pg.getTeams();
-        return teamFromRow(result.find(row => row.id === pick.teamID));
-      } catch (err) {
-        console.log(err.stack);
+      if (context.teams) {
+        return teamFromRow(context.teams.find(row => row.id === pick.teamID));
+      } else {
+        try {
+          const result = await context.dataSources.pg.getTeams();
+          return teamFromRow(result.find(row => row.id === pick.teamID));
+        } catch (err) {
+          console.log(err.stack);
+        }
       }
     },
   },
