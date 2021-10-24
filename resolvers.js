@@ -18,13 +18,15 @@ const resolvers = {
         console.log(err.stack);
       }
     },
-    async league(parent, { leagueID }, { dataSources }, info) {
-      try {
-        const result = await dataSources.pg.getLeagueById(leagueID);
-        return leagueFromRow(result);
-      } catch (err) {
-        console.log(err.stack);
-      }
+    async league(parent, { leagueID }, context, info) {
+      let [league, picks, users] = await Promise.all([
+        context.dataSources.pg.getLeagueById(leagueID),
+        context.dataSources.pg.getPicksForLeague(leagueID, parseInt(process.env.REVEALED_WEEK)),
+        context.dataSources.pg.getLeagueMembers(leagueID)
+      ]);
+      context.picks = picks;
+      context.users = users;
+      return leagueFromRow(league);
     },
     async leagues(parent, { userID }, { dataSources }, info) {
       try {
@@ -74,117 +76,6 @@ const resolvers = {
     }
   },
   Mutation: {
-    /*
-    async createFantasyLeague(parent, args, context, info) {
-      const client = await connectionPool.connect();
-      try {
-        await client.query('BEGIN');
-
-        const { ownerID, name, gameMode } = args.request;
-        const leagueResponse = await client.query('INSERT INTO "fantasy_leagues"(owner_id, name, game_mode) VALUES ($1, $2, $3) returning *', [ownerID, name, gameMode]);
-
-        const createdLeague = leagueResponse.rows[0];
-
-        const membershipResponse = await client.query('INSERT INTO memberships (user_id, league_id) VALUES ($1, $2) returning *', [ownerID, createdLeague.id]);
-
-        await client.query('COMMIT');
-
-        return {
-          league: {
-            id: createdLeague.id,
-            name: createdLeague.name,
-            owner: createdLeague.owner_id,
-            members: [],
-            gameMode: createdLeague.game_mode
-          }
-        };
-      } catch(error) {
-        console.log('uh ohhhh');
-        await client.query('ROLLBACK');
-      } finally {
-        client.release();
-      }
-    },
-
-    async createUser(parent, { request }, { db }, info) {
-      const { email } = request;
-
-      if (!emailValidator.validate(email)) {
-        return {
-          errors: [{
-            code: GQL_INVALID_INPUT,
-            message: 'Please provide a valid email address.'
-          }]
-        };
-      }
-
-      try {
-
-        const res = await db.query('INSERT INTO "users"(email) VALUES ($1) returning *', [email]);
-
-        const createdUser = res.rows[0];
-
-        return {
-          user: {
-            id: createdUser.id,
-            email: createdUser.email
-          }
-        };
-      } catch (error) {
-        let gqlError = {
-          code: GQL_UNKNOWN_ERROR,
-          message: 'An unknown error occurred'
-        }
-
-        const errorCode = error.code;
-
-        if (errorCode == PG_UNIQUE_VIOLATION) {
-          gqlError.code = GQL_UNIQUE_VIOLATION;
-          gqlError.message = 'A user with that email address already exists.'
-        }
-
-        return {
-          errors: [gqlError]
-        };
-
-      }
-    },
-
-    async addUserToFantasyLeague(parent, args, context, info) {
-      const client = await connectionPool.connect();
-      try {
-        const { userID, leagueID } = args.request;
-
-        const res = await client.query('INSERT INTO memberships(user_id, league_id) VALUES ($1, $2) returning *', [userID, leagueID]);
-
-        const createdUser = res.rows[0];
-
-        return {
-          league: null
-        };
-      } catch (error) {
-        let gqlError = {
-          code: GQL_UNKNOWN_ERROR,
-          message: 'An unknown error occurred'
-        }
-
-        const errorCode = error.code;
-
-        // This currently can't happen because there is no uniqueness constraint
-        // on this table included in existing migrations.
-        if (errorCode == PG_UNIQUE_VIOLATION) {
-          gqlError.code = GQL_UNIQUE_VIOLATION;
-          gqlError.message = 'That user is already a member of the specified league.'
-        }
-
-        return {
-          errors: [gqlError]
-        };
-      } finally {
-        client.release();
-      }
-    },*/
-
     async submitPick(parent, { request }, context, info) {
       const dataSources = context.dataSources;
       const validPick = await validatePick(request, dataSources.pg, context);
@@ -237,25 +128,25 @@ const resolvers = {
         console.log(err.stack);
       }
     },
-    async users(league, args, { dataSources }, info) {
-      try {
-        const result = await dataSources.pg.getLeagueMembers(league.id);
-        return result.map(function(row) {
+    async users(league, args, context, info) {
+      if (context.users) {
+        return context.users.map(function(row) {
           return userFromRow(row);
         });
-      } catch (err) {
-        console.log(err.stack);
+      } else {
+        throw new Error('User list not found');
       }
+
     },
-    async picks(league, args, { dataSources }, info) {
-      try {
-        const result = await dataSources.pg.getPicksForLeague(league.id, parseInt(process.env.REVEALED_WEEK));
-        return result.map(function(row) {
+    async picks(league, args, context, info) {
+      if (context.picks) {
+        return context.picks.map(function(row) {
           return pickFromRow(row);
         });
-      } catch (err) {
-        console.log(err.stack);
+      } else {
+        throw new Error('Pick list not found');
       }
+
     }
   },
   Pick: {
