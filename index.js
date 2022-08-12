@@ -1,6 +1,10 @@
 require('dotenv').config()
 
 const { ApolloServer } = require('apollo-server');
+const {
+  ApolloServerPluginLandingPageLocalDefault,
+  ApolloServerPluginLandingPageProductionDefault
+} = require ('apollo-server-core');
 const { connectionPool, DataSource } = require('./connection-pool');
 const { typeDefs } = require('./schema');
 const { resolvers } = require('./resolvers');
@@ -34,6 +38,14 @@ const server = new ApolloServer({
   typeDefs,
   resolvers,
   dataSources: () => ({ pg }),
+  plugins: [
+    process.env.NODE_ENV === "production"
+      ? ApolloServerPluginLandingPageProductionDefault({
+          footer: false,
+        })
+      : ApolloServerPluginLandingPageLocalDefault({ embed: true })
+  ],
+  cache: "bounded"
 });
 
 server.listen({
