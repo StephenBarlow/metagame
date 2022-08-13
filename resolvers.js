@@ -75,6 +75,9 @@ const resolvers = {
       } catch (err) {
         console.log(err.stack);
       }
+    },
+    async currentSeason(parent, {league}) {
+      return process.env.CURRENT_SEASON;
     }
   },
   Mutation: {

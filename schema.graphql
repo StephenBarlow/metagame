@@ -113,6 +113,7 @@ type Query {
   currentPick(leagueID: ID!, userID: ID!): [Pick!]
   sportsTeams(league: SportsLeague): [SportsTeam!]
   sportsGames(league: SportsLeague, season: String, week: Int): [SportsGame!]
+  currentSeason(league: SportsLeague): String
 }
 
 type Mutation {
