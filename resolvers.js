@@ -19,12 +19,17 @@ const resolvers = {
       }
     },
     async league(parent, { leagueID }, context, info) {
-      let [league, picks, users, teams] = await Promise.all([
+      let [league, users, teams] = await Promise.all([
         context.dataSources.pg.getLeagueById(leagueID),
-        context.dataSources.pg.getPicksForLeague(leagueID, parseInt(process.env.REVEALED_WEEK)),
         context.dataSources.pg.getLeagueMembers(leagueID),
         context.dataSources.pg.getTeams()
       ]);
+      let picks;
+      if (league.season === process.env.CURRENT_SEASON) {
+        picks = await context.dataSources.pg.getPicksForLeague(leagueID, parseInt(process.env.REVEALED_WEEK));
+      } else {
+        picks = await context.dataSources.pg.getPicksForLeague(leagueID);
+      }
       context.picks = picks;
       context.users = users;
       context.teams = teams;

@@ -4,6 +4,7 @@ const { SQLDataSource } = require('datasource-sql');
 const HOUR = 3600;
 const MINUTE = 60;
 const NOTHING = 1;
+const MAX_WEEK = 19;
 
 class PGDB extends SQLDataSource {
   async getTeams() {
@@ -179,7 +180,7 @@ class PGDB extends SQLDataSource {
         'league_id': leagueID,
         'invalidated_at': null
       })
-      .whereRaw('week <= ?', [week])
+      .whereRaw('week <= ?', (week ? [week] : [MAX_WEEK]))
       .cache(MINUTE);
     return val;
   }
