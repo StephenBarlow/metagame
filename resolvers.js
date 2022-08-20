@@ -162,7 +162,7 @@ const resolvers = {
   Pick: {
     async user(pick, args, context, info) {
       if (context.users) {
-        return userFromRow(context.users.find(user => user.id === pick.userID));
+        return userFromRow(context.users.find(user => user.user_id === pick.userID));
       } else {
         try {
           const result = await context.dataSources.pg.getLeagueMembers(pick.leagueID);
@@ -400,7 +400,7 @@ function pickFromRow(row) {
 
 function userFromRow(row) {
   return {
-    id: row.id,
+    id: row.user_id,
     email: row.email,
     displayName: row.display_name,
   }
