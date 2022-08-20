@@ -172,7 +172,7 @@ class PGDB extends SQLDataSource {
     return val;
   }
 
-  async getPicksForLeague(leagueID, week) {
+  async getPicksForLeague(leagueID, leagueConcluded = false) {
     const val = await this.knex
       .select('*')
       .from('picks')
@@ -180,7 +180,7 @@ class PGDB extends SQLDataSource {
         'league_id': leagueID,
         'invalidated_at': null
       })
-      .whereRaw('week <= ?', (week ? [week] : [MAX_WEEK]))
+      .whereRaw('week <= ?', (leagueConcluded ? [MAX_WEEK] : [parseInt(process.env.REVEALED_WEEK)] ))
       .cache(MINUTE);
     return val;
   }

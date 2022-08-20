@@ -26,9 +26,9 @@ const resolvers = {
       ]);
       let picks;
       if (league.season === process.env.CURRENT_SEASON) {
-        picks = await context.dataSources.pg.getPicksForLeague(leagueID, parseInt(process.env.REVEALED_WEEK));
-      } else {
         picks = await context.dataSources.pg.getPicksForLeague(leagueID);
+      } else {
+        picks = await context.dataSources.pg.getPicksForLeague(leagueID, true);
       }
       context.picks = picks;
       context.users = users;
