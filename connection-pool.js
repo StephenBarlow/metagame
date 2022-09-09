@@ -225,7 +225,7 @@ class PGDB extends SQLDataSource {
           'invalidated_at': null,
           'week': week,
           'user_id': userID,
-          'season': process.env.CURRENT_SEASON
+          'league_id': leagueID
         })
         .update({
           'invalidated_at': trx.raw('CURRENT_TIMESTAMP')
