@@ -224,7 +224,8 @@ class PGDB extends SQLDataSource {
         .where({
           'invalidated_at': null,
           'week': week,
-          'user_id': userID
+          'user_id': userID,
+          'season': process.env.CURRENT_SEASON
         })
         .update({
           'invalidated_at': trx.raw('CURRENT_TIMESTAMP')
