@@ -1,6 +1,7 @@
 require('dotenv').config()
 
 const { ApolloServer } = require('apollo-server');
+const { buildSubgraphSchema } = require('@apollo/subgraph');
 const {
   ApolloServerPluginLandingPageLocalDefault,
   ApolloServerPluginLandingPageProductionDefault
@@ -35,8 +36,7 @@ if (process.env.DATABASE_URL) {
 const pg = new DataSource(knexConfig);
 
 const server = new ApolloServer({
-  typeDefs,
-  resolvers,
+  schema: buildSubgraphSchema({ typeDefs, resolvers }),
   dataSources: () => ({ pg }),
   plugins: [
     process.env.NODE_ENV === "production"
