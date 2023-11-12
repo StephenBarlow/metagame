@@ -1,7 +1,6 @@
 require('dotenv').config()
 
 const { ApolloServer } = require('apollo-server');
-const { buildSubgraphSchema } = require('@apollo/subgraph');
 const {
   ApolloServerPluginLandingPageLocalDefault,
   ApolloServerPluginLandingPageProductionDefault
@@ -35,21 +34,63 @@ if (process.env.DATABASE_URL) {
 
 const pg = new DataSource(knexConfig);
 
+const loggingPlugin = {
+  async requestDidStart(requestContext) {
+    console.log(`Processing started for operation ${requestContext.request.operationName}`);
+    return {
+      async parsingDidStart(requestContext) {
+        return async (err) => {
+          if (err) {
+            console.error(err);
+          }
+        }
+      },
+      async validationDidStart(requestContext) {
+        // This end hook is unique in that it can receive an array of errors,
+        // which will contain every validation error that occurred.
+        return async (errs) => {
+          if (errs) {
+            errs.forEach(err => console.error(err));
+          }
+        }
+      },
+      async didEncounterErrors(requestContext) {
+        console.error(`Error while executing operation ${requestContext.request.operationName}`);
+        console.error(`Msg: ${requestContext.errors[0].message}`);
+        console.error(`Query String: ${requestContext.request.query}`);
+      },
+      async executionDidStart(requestContext) {
+        return {
+          async executionDidEnd(err) {
+            console.log(`Execution completed for operation ${requestContext.request.operationName}`);
+            if (err) {
+              console.error(err);
+            }
+          }
+        };
+      },
+    };
+  },
+}
+
 const server = new ApolloServer({
-  schema: buildSubgraphSchema({ typeDefs, resolvers }),
+  typeDefs,
+  resolvers,
   dataSources: () => ({ pg }),
   plugins: [
+    loggingPlugin,
     process.env.NODE_ENV === "production"
       ? ApolloServerPluginLandingPageProductionDefault({
           footer: false,
         })
       : ApolloServerPluginLandingPageLocalDefault({ embed: true })
   ],
-  cache: "bounded"
+  cache: "bounded",
+  introspection: true
 });
 
 server.listen({
   port: PORT
 }).then(({ url }) => {
-  console.log(`🚀  Server ready at ${url}`);
+  console.log(`Server ready at ${url}`);
 });
