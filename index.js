@@ -12,7 +12,7 @@ const bunyan = require('bunyan');
 
 // Create a logger instance
 const logger = bunyan.createLogger({
-    name: 'metagame',
+    name: 'example-app',
     level: 'info'
 });
 
