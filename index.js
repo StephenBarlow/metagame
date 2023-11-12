@@ -8,7 +8,13 @@ const {
 const { connectionPool, DataSource } = require('./connection-pool');
 const { typeDefs } = require('./schema');
 const { resolvers } = require('./resolvers');
+const bunyan = require('bunyan');
 
+// Create a logger instance
+const logger = bunyan.createLogger({
+    name: 'metagame',
+    level: 'info'
+});
 
 const PORT = process.env.PORT || 4000;
 
@@ -36,12 +42,12 @@ const pg = new DataSource(knexConfig);
 
 const loggingPlugin = {
   async requestDidStart(requestContext) {
-    console.log(`Processing started for operation ${requestContext.request.operationName}`);
+    logger.info(`Processing started for operation ${requestContext.request.operationName}`);
     return {
       async parsingDidStart(requestContext) {
         return async (err) => {
           if (err) {
-            console.error(err);
+            logger.error(err);
           }
         }
       },
@@ -50,21 +56,21 @@ const loggingPlugin = {
         // which will contain every validation error that occurred.
         return async (errs) => {
           if (errs) {
-            errs.forEach(err => console.error(err));
+            errs.forEach(err => logger.error(err));
           }
         }
       },
       async didEncounterErrors(requestContext) {
-        console.error(`Error while executing operation ${requestContext.request.operationName}`);
-        console.error(`Msg: ${requestContext.errors[0].message}`);
-        console.error(`Query String: ${requestContext.request.query}`);
+        logger.error(`Error while executing operation ${requestContext.request.operationName}`);
+        logger.error(`Msg: ${requestContext.errors[0].message}`);
+        logger.error(`Query String: ${requestContext.request.query}`);
       },
       async executionDidStart(requestContext) {
         return {
           async executionDidEnd(err) {
-            console.log(`Execution completed for operation ${requestContext.request.operationName}`);
+            logger.info(`Execution completed for operation ${requestContext.request.operationName}`);
             if (err) {
-              console.error(err);
+              logger.error(err);
             }
           }
         };
@@ -92,5 +98,5 @@ const server = new ApolloServer({
 server.listen({
   port: PORT
 }).then(({ url }) => {
-  console.log(`Server ready at ${url}`);
+  logger.info(`Server ready at ${url}`);
 });
