@@ -1,4 +1,6 @@
-# metagame
+# Metagame
+
+API server for the Metagame pick 'em engine.
 
 Uses the `db-migrate` library, globally installed, for db migrations:
 
