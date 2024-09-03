@@ -168,7 +168,7 @@ class PGDB extends SQLDataSource {
       .where({
         'memberships.league_id': leagueID
       })
-      .cache(HOUR);
+      .cache(MINUTE);
     return val;
   }
 

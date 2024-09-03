@@ -7,6 +7,7 @@ const GQL_UNIQUE_VIOLATION = 'ERR_DUPLICATE';
 const GQL_INVALID_INPUT = 'ERR_INVALID_INPUT'
 const BYE = '-1';
 const BYE_LIMIT = 4;
+const FINAL_WEEK = 18;
 
 const resolvers = {
   Query: {
@@ -317,6 +318,14 @@ async function validatePickTwoPick(pickRequest, pg, context) {
       pickedGames.push(hasGame);
     } else {
       context.errorMessage = `Team ${currentTeam.short_name} does not appear to have a game this week! If this is incorrect, please email Stephen to make your pick.`
+      return false;
+    }
+  }
+
+  // Make sure the teams aren't playing each other (unless week 18)
+  if (pickedGames.length) {
+    if (pickedGames[0].id === pickedGames[1].id && week < FINAL_WEEK) {
+      context.errorMessage = `Can't select two teams playing each other (except in week ${FINAL_WEEK}).`
       return false;
     }
   }
