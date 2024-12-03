@@ -1,4 +1,4 @@
-# metagame
+# Metagame: A GraphQL backend for picking games
 
 Uses the `db-migrate` library, globally installed, for db migrations:
 
