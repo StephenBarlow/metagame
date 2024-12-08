@@ -5,6 +5,7 @@ type Pick {
   team: SportsTeam!
   week: Int
   isInvalidated: Boolean!
+  name: String!
 }
 
 input SubmitPickRequest {
