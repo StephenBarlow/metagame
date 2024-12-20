@@ -5,13 +5,14 @@ jobs:
   Deploy-Render:
       runs-on: ubuntu-latest
       steps:
+        # Downloads the Render CLI binary and adds it to the PATH.
+        # To prevent breaking changes in CI/CD, we pin to a
+        # specific CLI version (in this case 1.1.0).
         - name: Install Render CLI
-          # Download the Render CLI binary and add it to PATH
-          # Note that we install a specific CLI version to prevent breaking changes
           run: |
-            curl -L https://github.com/render-oss/cli/releases/download/v0.8.6/cli_0.8.6_linux_amd64.zip -o render.zip
+            curl -L https://github.com/render-oss/cli/releases/download/v1.1.0/cli_1.1.0_linux_amd64.zip -o render.zip
             unzip render.zip
-            sudo mv cli_v0.8.6 /usr/local/bin/render
+            sudo mv cli_v1.1.0 /usr/local/bin/render
         - name: Authorize Render CLI and trigger deploy
           env:
             RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
