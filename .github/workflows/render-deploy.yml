@@ -1,6 +1,9 @@
 name: Render CLI Deploy
 run-name: Deploying via Render CLI
-on: [push]
+on:
+  push:
+    branches:
+      - master
 jobs:
   Deploy-Render:
       runs-on: ubuntu-latest
