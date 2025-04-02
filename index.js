@@ -95,6 +95,8 @@ const server = new ApolloServer({
   introspection: true
 });
 
+logger.info('Starting up server...');
+
 server.listen({
   port: PORT
 }).then(({ url }) => {
