@@ -21,3 +21,6 @@ jobs:
 
     steps:
     - run: true
+    - run: true
+    - run: true
+    - run: true
