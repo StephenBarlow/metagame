@@ -20,12 +20,16 @@ const PORT = process.env.PORT || 4000;
 
 let knexConfig = {
   client: "pg",
-  version: "13.3"
+  version: "13.3",
+  pool: {
+    min: 0,
+    max: 3
+  }
 };
 
 if (process.env.DATABASE_URL) {
   knexConfig.connection = {
-    connectionString: process.env.DATABASE_URL,
+    connectionString: process.env.DATABASE_URL + "?application_name=metagame",
     ssl: { rejectUnauthorized: false }
   };
 } else {
@@ -95,7 +99,7 @@ const server = new ApolloServer({
   introspection: true
 });
 
-logger.info('Starting up server...');
+logger.info('Starting up server');
 
 server.listen({
   port: PORT
