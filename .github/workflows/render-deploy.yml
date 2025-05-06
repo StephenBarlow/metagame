@@ -20,6 +20,6 @@ jobs:
           env:
             RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
             CI: true
-          run: |
-            render login --output json
-            render deploys create ${{ secrets.RENDER_SERVICE_ID }} --output json --confirm
+          run: #|
+            # render login --output json
+            # render deploys create ${{ secrets.RENDER_SERVICE_ID }} --output json --confirm
