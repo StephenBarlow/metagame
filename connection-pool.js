@@ -249,6 +249,15 @@ class PGDB extends SQLDataSource {
 
     return responseRows;
   }
+
+  async invalidatePicks(pickIDs) {
+    const knex = this.knex;
+    await knex('picks')
+      .whereIn('id', pickIDs)
+      .update({
+        'invalidated_at': knex.raw('CURRENT_TIMESTAMP')
+      });
+  }
 }
 
 exports.DataSource = PGDB;

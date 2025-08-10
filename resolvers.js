@@ -124,6 +124,37 @@ const resolvers = {
           }]
         };
       }
+    },
+    async invalidatePicks(parent, { request }, context, info) {
+      const dataSources = context.dataSources;
+      const { pickIDs } = request;
+
+      // Validate input
+      if (!pickIDs || !Array.isArray(pickIDs) || pickIDs.length === 0) {
+        return {
+          success: false,
+          errors: [{
+            code: GQL_INVALID_INPUT,
+            message: 'Invalid pick IDs provided.'
+          }]
+        };
+      }
+
+      try {
+        await dataSources.pg.invalidatePicks(pickIDs);
+        return {
+          success: true
+        };
+      } catch (err) {
+        console.log(err.stack);
+        return {
+          success: false,
+          errors: [{
+            code: GQL_UNKNOWN_ERROR,
+            message: 'Failed to clear picks. Please try again later.'
+          }]
+        };
+      }
     }
   },
   SportsGame: {

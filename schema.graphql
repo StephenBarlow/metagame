@@ -19,6 +19,15 @@ type SubmitPickResponse {
   errors: [Error!]
 }
 
+input InvalidatePicksRequest {
+  pickIDs: [ID!]!
+}
+
+type InvalidatePicksResponse {
+  success: Boolean!
+  errors: [Error!]
+}
+
 type User {
   id: ID!
   email: String!
@@ -122,6 +131,7 @@ type Mutation {
   #createFantasyLeague(request: CreateFantasyLeagueRequest!): CreateFantasyLeagueResponse
   #addUserToFantasyLeague(request: AddUserToFantasyLeagueRequest!): AddUserToFantasyLeagueResponse
   submitPick(request: SubmitPickRequest!): SubmitPickResponse
+  invalidatePicks(request: InvalidatePicksRequest!): InvalidatePicksResponse
   #createSportsGame(request: CreateSportsGameRequest!): CreateSportsGameResponse
 }
 
