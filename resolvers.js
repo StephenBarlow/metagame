@@ -317,7 +317,7 @@ async function validatePickTwoPick(pickRequest, pg, context) {
     if (hasGame) {
       pickedGames.push(hasGame);
     } else {
-      context.errorMessage = `Team ${currentTeam.short_name} does not appear to have a game this week! If this is incorrect, please email Stephen to make your pick.`
+      context.errorMessage = `Team ${currentTeam.short_name} does not appear to have a game during the selected week! If this is incorrect, please email commissioner to make your pick.`
       return false;
     }
   }
@@ -335,7 +335,7 @@ async function validatePickTwoPick(pickRequest, pg, context) {
   for (const game of pickedGames) {
     const gameDate = new Date(game.start_time);
     if (gameDate < now) {
-      context.errorMessage = 'At least one selected game appears to have already started! If this is incorrect, please email Stephen to make your pick.'
+      context.errorMessage = 'At least one selected game appears to have already started! If this is incorrect, please email commissioner to make your pick.'
       return false;
     }
   }
@@ -355,7 +355,7 @@ async function validatePickTwoPick(pickRequest, pg, context) {
         }
       } else {
         // At least one of these teams has already been picked by this player
-        context.errorMessage = 'You have already picked at least one of these teams! If this is incorrect, please email Stephen to make your pick.'
+        context.errorMessage = 'You have already picked at least one of these teams! If this is incorrect, please email commissioner to make your pick.'
         return false;
       }
     }
@@ -383,7 +383,7 @@ async function validatePickTwoPick(pickRequest, pg, context) {
       if (pickedGame) {
         const gameDate = new Date(pickedGame.start_time);
         if (gameDate < now) {
-          context.errorMessage = 'At least one team from your PREVIOUS submission has already started their game. If this is incorrect, please email Stephen to make your pick.'
+          context.errorMessage = 'At least one team from your PREVIOUS submission has already started their game. If this is incorrect, please email commissioner to make your pick.'
           return false;
         }
       }
