@@ -208,7 +208,7 @@ class PGDB extends SQLDataSource {
         'league_id': leagueID,
         'invalidated_at': null
       })
-      .cache(MINUTE);
+      .cache(NOTHING);
     return val;
   }
 

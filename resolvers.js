@@ -82,6 +82,16 @@ const resolvers = {
         console.log(err.stack);
       }
     },
+    async picksForUser(parent, {leagueID, userID}, { dataSources }, info) {
+      try {
+        const result = await dataSources.pg.getPicksForMember(userID, leagueID);
+        return result.map(function(row) {
+          return pickFromRow(row);
+        });
+      } catch (err) {
+        console.log(err.stack);
+      }
+    },
     async currentSeason(parent, {league}) {
       return process.env.CURRENT_SEASON;
     }

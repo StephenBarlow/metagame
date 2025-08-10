@@ -111,6 +111,7 @@ type Query {
   league(leagueID: ID!): FantasyLeague
   leagues(userID: String): [FantasyLeague!]
   currentPick(leagueID: ID!, userID: ID!): [Pick!]
+  picksForUser(leagueID: ID!, userID: ID!): [Pick!]
   sportsTeams(league: SportsLeague): [SportsTeam!]
   sportsGames(league: SportsLeague, season: String, week: Int): [SportsGame!]
   currentSeason(league: SportsLeague): String
