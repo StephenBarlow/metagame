@@ -491,7 +491,7 @@ function gamesFromRows(rows, allTeams) {
     games.push({
       id: row.id,
       sportsLeague: row.sports_league,
-      startsAt: row.start_time,
+      startsAt: new Date(row.start_time).toISOString(),
       week: row.week,
       awayTeam: teamFromRow(awayTeam),
       homeTeam: teamFromRow(homeTeam),

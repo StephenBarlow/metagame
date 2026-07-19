@@ -6,7 +6,7 @@ const {
   ApolloServerPluginLandingPageLocalDefault,
   ApolloServerPluginLandingPageProductionDefault
 } = require('@apollo/server/plugin/landingPage/default');
-const { DataSource } = require('./connection-pool');
+const { PGDB } = require('./connection-pool');
 const { typeDefs } = require('./schema');
 const { resolvers } = require('./resolvers');
 const bunyan = require('bunyan');
@@ -42,8 +42,6 @@ if (process.env.DATABASE_URL) {
     password: ''
   }
 }
-
-const pg = new DataSource(knexConfig);
 
 const loggingPlugin = {
   async requestDidStart(requestContext) {
@@ -101,10 +99,7 @@ const server = new ApolloServer({
 
 logger.info('Starting up server...');
 
-pg.initialize({
-  cache: server.cache,
-  context: {}
-});
+const pg = new PGDB(knexConfig, server.cache);
 
 startStandaloneServer(server, {
   context: async () => ({ dataSources: { pg } }),
