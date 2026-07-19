@@ -1,11 +1,12 @@
 require('dotenv').config()
 
-const { ApolloServer } = require('apollo-server');
+const { ApolloServer } = require('@apollo/server');
+const { startStandaloneServer } = require('@apollo/server/standalone');
 const {
   ApolloServerPluginLandingPageLocalDefault,
   ApolloServerPluginLandingPageProductionDefault
-} = require ('apollo-server-core');
-const { connectionPool, DataSource } = require('./connection-pool');
+} = require('@apollo/server/plugin/landingPage/default');
+const { DataSource } = require('./connection-pool');
 const { typeDefs } = require('./schema');
 const { resolvers } = require('./resolvers');
 const bunyan = require('bunyan');
@@ -86,7 +87,6 @@ const loggingPlugin = {
 const server = new ApolloServer({
   typeDefs,
   resolvers,
-  dataSources: () => ({ pg }),
   plugins: [
     loggingPlugin,
     process.env.NODE_ENV === "production"
@@ -101,8 +101,14 @@ const server = new ApolloServer({
 
 logger.info('Starting up server...');
 
-server.listen({
-  port: PORT
+pg.initialize({
+  cache: server.cache,
+  context: {}
+});
+
+startStandaloneServer(server, {
+  context: async () => ({ dataSources: { pg } }),
+  listen: { port: PORT }
 }).then(({ url }) => {
   logger.info(`Server ready at ${url}`);
 });

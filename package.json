@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node index.js"
   },
@@ -17,7 +20,7 @@
   },
   "homepage": "https://github.com/StephenBarlow/metagame#readme",
   "dependencies": {
-    "apollo-server": "^3.13.0",
+    "@apollo/server": "^5.5.1",
     "async": "^3.2.6",
     "bunyan": "^1.8.15",
     "csv-parse": "^4.16.3",
@@ -26,7 +29,7 @@
     "db-migrate-pg": "^1.5.2",
     "dotenv": "^9.0.2",
     "email-validator": "^2.0.4",
-    "graphql": "^16.9.0",
+    "graphql": "^16.14.2",
     "pg": "^8.12.0"
   }
 }
