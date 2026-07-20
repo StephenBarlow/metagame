@@ -1,12 +1,17 @@
 require('dotenv').config()
 
+const http = require('http');
+const cors = require('cors');
+const express = require('express');
 const { ApolloServer } = require('@apollo/server');
-const { startStandaloneServer } = require('@apollo/server/standalone');
+const { ApolloServerPluginDrainHttpServer } = require('@apollo/server/plugin/drainHttpServer');
+const { expressMiddleware } = require('@as-integrations/express5');
 const {
   ApolloServerPluginLandingPageLocalDefault,
   ApolloServerPluginLandingPageProductionDefault
 } = require('@apollo/server/plugin/landingPage/default');
 const { PGDB } = require('./connection-pool');
+const { createAdminRouter } = require('./admin');
 const { typeDefs } = require('./schema');
 const { resolvers } = require('./resolvers');
 const bunyan = require('bunyan');
@@ -21,7 +26,6 @@ const PORT = process.env.PORT || 4000;
 
 let knexConfig = {
   client: "pg",
-  version: "13.3",
   pool: {
     min: 0,
     max: 3
@@ -82,28 +86,50 @@ const loggingPlugin = {
   },
 }
 
-const server = new ApolloServer({
-  typeDefs,
-  resolvers,
-  plugins: [
-    loggingPlugin,
-    process.env.NODE_ENV === "production"
-      ? ApolloServerPluginLandingPageProductionDefault({
-          footer: false,
-        })
-      : ApolloServerPluginLandingPageLocalDefault({ embed: true })
-  ],
-  cache: "bounded",
-  introspection: true
-});
+async function start() {
+  const app = express();
+  const httpServer = http.createServer(app);
+  const server = new ApolloServer({
+    typeDefs,
+    resolvers,
+    plugins: [
+      loggingPlugin,
+      ApolloServerPluginDrainHttpServer({ httpServer }),
+      process.env.NODE_ENV === "production"
+        ? ApolloServerPluginLandingPageProductionDefault({
+            footer: false,
+          })
+        : ApolloServerPluginLandingPageLocalDefault({ embed: true })
+    ],
+    cache: "bounded",
+    introspection: true
+  });
 
-logger.info('Starting up server...');
+  logger.info('Starting up server...');
+  const pg = new PGDB(knexConfig, server.cache);
 
-const pg = new PGDB(knexConfig, server.cache);
+  await server.start();
+  app.disable('x-powered-by');
+  app.use('/admin', createAdminRouter({ pg, logger }));
+  app.use(
+    '/',
+    cors(),
+    express.json(),
+    expressMiddleware(server, {
+      context: async () => ({ dataSources: { pg } })
+    })
+  );
 
-startStandaloneServer(server, {
-  context: async () => ({ dataSources: { pg } }),
-  listen: { port: PORT }
-}).then(({ url }) => {
-  logger.info(`Server ready at ${url}`);
-});
+  await new Promise(resolve => httpServer.listen({ port: PORT }, resolve));
+  logger.info(`Server ready at http://localhost:${httpServer.address().port}/`);
+  return { app, httpServer, pg, server };
+}
+
+if (require.main === module) {
+  start().catch(err => {
+    logger.error(err);
+    process.exitCode = 1;
+  });
+}
+
+exports.start = start;

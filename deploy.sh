@@ -1,2 +1,2 @@
-npm install
-db-migrate -e prod up
+bun install --frozen-lockfile
+bunx --bun --no-install db-migrate -e prod up

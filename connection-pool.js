@@ -22,6 +22,11 @@ class PGDB {
       .digest('base64');
   }
 
+  async invalidateQueries(queries) {
+    const keys = new Set(queries.map(query => this.cacheKeyFor(query)));
+    await Promise.all([...keys].map(key => this.cache.delete(key)));
+  }
+
   async cacheQuery(query, ttl = 5) {
     const cacheKey = this.cacheKeyFor(query);
     const entry = await this.cache.get(cacheKey);
@@ -72,6 +77,94 @@ class PGDB {
       });
   }
 
+  sportsGamesQuery(season) {
+    return this.knex
+      .select('*')
+      .from('sports_games')
+      .where({
+        'season': season
+      });
+  }
+
+  sportsGamesForWeekQuery(season, week) {
+    return this.knex
+      .select('*')
+      .from('sports_games')
+      .where({
+        'season': season,
+        'week': week
+      });
+  }
+
+  userByEmailQuery(email) {
+    return this.knex
+      .select('*')
+      .from('users')
+      .where({
+        'email': email
+      })
+      .limit(1);
+  }
+
+  userDisplayNameForLeagueQuery(userID, leagueID) {
+    return this.knex
+      .select('display_name')
+      .from('memberships')
+      .innerJoin('fantasy_leagues', 'fantasy_leagues.id', 'memberships.league_id')
+      .where({
+        'memberships.user_id': userID,
+        'fantasy_leagues.id': leagueID
+      })
+      .limit(1);
+  }
+
+  allLeaguesQuery() {
+    return this.knex
+      .select('*')
+      .from('fantasy_leagues');
+  }
+
+  leaguesForUserQuery(userID) {
+    return this.knex
+      .select('*')
+      .from('fantasy_leagues')
+      .innerJoin('memberships', 'fantasy_leagues.id', 'memberships.league_id')
+      .where({
+        'memberships.user_id': userID
+      });
+  }
+
+  leagueByIdQuery(leagueID) {
+    return this.knex
+      .select('*')
+      .from('fantasy_leagues')
+      .where({
+        'id': leagueID
+      });
+  }
+
+  leagueMembersQuery(leagueID) {
+    return this.knex
+      .select('*')
+      .from('users')
+      .innerJoin('memberships', 'users.id', 'memberships.user_id')
+      .where({
+        'memberships.league_id': leagueID
+      });
+  }
+
+  leagueOwnerQuery(leagueID, ownerID) {
+    return this.knex
+      .select('*')
+      .from('users')
+      .innerJoin('memberships', 'users.id', 'memberships.user_id')
+      .where({
+        'memberships.league_id': leagueID,
+        'users.id': ownerID
+      })
+      .limit(1);
+  }
+
   async invalidatePickCache(picks) {
     const leagueIDs = new Set();
     const members = new Map();
@@ -95,7 +188,48 @@ class PGDB {
       queries.push(this.currentPickQuery(leagueID, userID, week));
     }
 
-    await Promise.all(queries.map(query => this.cache.delete(this.cacheKeyFor(query))));
+    await this.invalidateQueries(queries);
+  }
+
+  async invalidateSportsGameCache(games) {
+    const queries = [];
+
+    for (const game of games) {
+      if (!game) continue;
+      const seasons = new Set([game.season, String(game.season), Number(game.season)]);
+      const weeks = new Set([game.week, String(game.week), Number(game.week)]);
+      for (const season of seasons) {
+        queries.push(this.sportsGamesQuery(season));
+        for (const week of weeks) {
+          queries.push(this.sportsGamesForWeekQuery(season, week));
+        }
+      }
+    }
+
+    await this.invalidateQueries(queries);
+  }
+
+  async invalidateUserCache(email) {
+    await this.invalidateQueries([this.userByEmailQuery(email)]);
+  }
+
+  async invalidateLeagueCache(leagueID) {
+    await this.invalidateQueries([
+      this.allLeaguesQuery(),
+      this.leagueByIdQuery(leagueID)
+    ]);
+  }
+
+  async invalidateMembershipCache(userID, leagueID, ownerID) {
+    const queries = [
+      this.leagueMembersQuery(leagueID),
+      this.leaguesForUserQuery(userID),
+      this.userDisplayNameForLeagueQuery(userID, leagueID)
+    ];
+    if (String(userID) === String(ownerID)) {
+      queries.push(this.leagueOwnerQuery(leagueID, ownerID));
+    }
+    await this.invalidateQueries(queries);
   }
 
   async getTeams() {
@@ -110,12 +244,7 @@ class PGDB {
 
   async getSportsGames(season) {
     const val = await this.cacheQuery(
-      this.knex
-        .select('*')
-        .from('sports_games')
-        .where({
-          'season': season
-        }),
+      this.sportsGamesQuery(season),
       MINUTE
     );
     return val;
@@ -123,13 +252,7 @@ class PGDB {
 
   async getSportsGamesForWeek(season, week) {
     const val = await this.cacheQuery(
-      this.knex
-        .select('*')
-        .from('sports_games')
-        .where({
-          'season': season,
-          'week': week
-        }),
+      this.sportsGamesForWeekQuery(season, week),
       MINUTE
     );
     return val;
@@ -137,13 +260,7 @@ class PGDB {
 
   async getUserByEmail(email) {
     const val = await this.cacheQuery(
-      this.knex
-        .select('*')
-        .from('users')
-        .where({
-          'email': email
-        })
-        .limit(1),
+      this.userByEmailQuery(email),
       HOUR
     );
     if (val.length) {
@@ -169,15 +286,7 @@ class PGDB {
 
   async getUserDisplayNameForLeague(userID, leagueID) {
     const val = await this.cacheQuery(
-      this.knex
-        .select('display_name')
-        .from('memberships')
-        .innerJoin('fantasy_leagues', 'fantasy_leagues.id', 'memberships.league_id')
-        .where({
-          'memberships.user_id': userID,
-          'fantasy_leagues.id': leagueID
-        })
-        .limit(1),
+      this.userDisplayNameForLeagueQuery(userID, leagueID),
       MINUTE
     );
     if (val.length) {
@@ -187,9 +296,7 @@ class PGDB {
 
   async getAllLeagues() {
     const val = await this.cacheQuery(
-      this.knex
-        .select('*')
-        .from('fantasy_leagues'),
+      this.allLeaguesQuery(),
       MINUTE
     );
     return val;
@@ -197,13 +304,7 @@ class PGDB {
 
   async getLeaguesForUser(userID) {
     const val = await this.cacheQuery(
-      this.knex
-        .select('*')
-        .from('fantasy_leagues')
-        .innerJoin('memberships', 'fantasy_leagues.id', 'memberships.league_id')
-        .where({
-          'memberships.user_id': userID
-        }),
+      this.leaguesForUserQuery(userID),
       MINUTE
     );
     return val;
@@ -211,12 +312,7 @@ class PGDB {
 
   async getLeagueById(leagueID) {
     const val = await this.cacheQuery(
-      this.knex
-        .select('*')
-        .from('fantasy_leagues')
-        .where({
-          'id': leagueID
-        }),
+      this.leagueByIdQuery(leagueID),
       MINUTE
     );
     if (val.length) {
@@ -259,15 +355,7 @@ class PGDB {
 
   async getLeagueOwner(leagueId, ownerId) {
     const val = await this.cacheQuery(
-      this.knex
-        .select('*')
-        .from('users')
-        .innerJoin('memberships', 'users.id', 'memberships.user_id')
-        .where({
-          'memberships.league_id': leagueId,
-          'users.id': ownerId
-        })
-        .limit(1),
+      this.leagueOwnerQuery(leagueId, ownerId),
       MINUTE
     );
     if (val.length) {
@@ -277,13 +365,7 @@ class PGDB {
 
   async getLeagueMembers(leagueID) {
     const val = await this.cacheQuery(
-      this.knex
-        .select('*')
-        .from('users')
-        .innerJoin('memberships', 'users.id', 'memberships.user_id')
-        .where({
-          'memberships.league_id': leagueID
-        }),
+      this.leagueMembersQuery(leagueID),
       MINUTE
     );
     return val;
