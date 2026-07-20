@@ -383,6 +383,18 @@ async function validatePickTwoPick(pickRequest, pg, context) {
 
   const pastPicks = await pg.getPicksForMember(userID, leagueID);
 
+  // Do not accept a resubmission that is identical to the player's active
+  // pick for this week. Compare as a set so the order of the two teams does
+  // not matter (and this also handles submitting BYE twice).
+  const thisWeekPicks = pastPicks.filter(pick => pick.week === week);
+  const submittedTeams = teamIDs.map(String).sort();
+  const existingTeams = thisWeekPicks.map(pick => String(pick.team_id)).sort();
+  if (existingTeams.length === submittedTeams.length &&
+      existingTeams.every((teamID, index) => teamID === submittedTeams[index])) {
+    context.errorMessage = 'The submitted pick matches your existing pick.';
+    return false;
+  }
+
   // Check if any picked team has been picked before
   let bye_count = 0;
   for (const pick of pastPicks) {
@@ -404,7 +416,6 @@ async function validatePickTwoPick(pickRequest, pg, context) {
 
   // Check if this player previously picked a team
   // this week that already started their game
-  const thisWeekPicks = pastPicks.filter(pick => (pick.week === week));
   if (thisWeekPicks) {
     let pickedTeams = [];
     for (const pick of thisWeekPicks) {
