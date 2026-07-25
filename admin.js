@@ -110,6 +110,7 @@ function page(title, content, notice, noticeType = 'success') {
     <a href="/admin/teams">Teams & tags</a>
     <a href="/admin/schedule">Schedule import</a>
     <a href="/admin/picks">Picks</a>
+    <a href="/admin/achievements">Achievements</a>
     <a href="/admin/leagues">Leagues</a>
     <a href="/admin/users">Users</a>
   </nav></header>
@@ -526,6 +527,49 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     redirectWithNotice(res, '/admin/users', 'User created.');
   });
 
+  router.get('/achievements', async (req, res) => {
+    const achievements = await db('achievements').select('*').orderBy('key');
+    const rows = achievements.map(achievement => `<tr>
+      <td><code>${escapeHtml(achievement.key)}</code></td>
+      <td>${escapeHtml(achievement.name)}</td>
+      <td>${achievement.active ? 'Active' : 'Inactive'}</td>
+      <td><a href="/admin/achievements/${achievement.id}/edit">Edit</a></td>
+    </tr>`).join('');
+    const content = `<p class="muted">Achievement keys and evaluation settings are read-only here.</p>
+      <div class="table-wrap"><table><thead><tr><th>Key</th><th>Name</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4">No achievements found.</td></tr>'}</tbody></table></div>`;
+    res.send(page('Achievements', content, req.query.notice, req.query.notice_type));
+  });
+
+  router.get('/achievements/:id/edit', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Achievement ID');
+    const achievement = await db('achievements').where({ id }).first();
+    if (!achievement) return res.status(404).send(page('Achievement not found', '<p>No achievement has that ID.</p>'));
+    res.send(page(`Edit achievement ${achievement.name}`, achievementForm(achievement), req.query.notice, req.query.notice_type));
+  });
+
+  router.post('/achievements/:id', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Achievement ID');
+    if (!(await db('achievements').where({ id }).first())) throw new AdminInputError('Achievement not found.');
+    const name = String(req.body.name ?? '').trim();
+    const description = String(req.body.description ?? '').trim();
+    const imageURL = String(req.body.image_url ?? '').trim();
+    if (!name) throw new AdminInputError('Achievement name is required.');
+    if (name.length > 255) throw new AdminInputError('Achievement name must be 255 characters or fewer.');
+    if (!description) throw new AdminInputError('Achievement description is required.');
+    if (description.length > 10000) throw new AdminInputError('Achievement description must be 10,000 characters or fewer.');
+    if (imageURL.length > 2048) throw new AdminInputError('Image URL must be 2,048 characters or fewer.');
+    if (imageURL && !/^(https?:\/\/|\/)/i.test(imageURL)) {
+      throw new AdminInputError('Image URL must be an http(s) URL or an application-relative path.');
+    }
+    await db('achievements').where({ id }).update({
+      name,
+      description,
+      image_url: imageURL || null,
+      active: req.body.active === 'on'
+    });
+    redirectWithNotice(res, `/admin/achievements/${id}/edit`, 'Achievement updated.');
+  });
+
   router.use((err, req, res, next) => {
     logger.error?.(err);
     const knownDatabaseError = err.code === '23505' ? 'That record already exists.' : null;
@@ -644,6 +688,18 @@ function gameForm(game, teams, action, submitLabel, tags = []) {
     <label>Home score<input name="home_team_score" type="number" min="0" value="${escapeHtml(game?.home_team_score ?? '')}"></label>
     <button type="submit">${escapeHtml(submitLabel)}</button>
   </form></div>${tagHtml}<p><a href="/admin/games?season=${escapeHtml(season)}">Back to games</a></p>`;
+}
+
+function achievementForm(achievement) {
+  return `<div class="panel"><form method="post" action="/admin/achievements/${achievement.id}">
+    <p><strong>Key:</strong> <code>${escapeHtml(achievement.key)}</code></p>
+    <p><strong>Evaluator:</strong> <code>${escapeHtml(achievement.evaluator)}</code> · <strong>Phase:</strong> <code>${escapeHtml(achievement.evaluation_phase)}</code> · <strong>Scope:</strong> <code>${escapeHtml(achievement.scope)}</code></p>
+    <label>Name<input name="name" maxlength="255" required value="${escapeHtml(achievement.name)}"></label>
+    <label>Description<textarea name="description" maxlength="10000" required>${escapeHtml(achievement.description)}</textarea></label>
+    <label>Image URL<input name="image_url" maxlength="2048" value="${escapeHtml(achievement.image_url ?? '')}" placeholder="https://… or /images/…"></label>
+    <label><input name="active" type="checkbox"${achievement.active ? ' checked' : ''}> Active</label>
+    <button type="submit">Save achievement</button>
+  </form></div><p><a href="/admin/achievements">Back to achievements</a></p>`;
 }
 
 function scheduleForm(season = process.env.CURRENT_SEASON ?? '', csv = '') {
