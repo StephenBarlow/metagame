@@ -34,6 +34,7 @@ existing game.
 The admin interface supports:
 
 - adding games and editing one game's schedule or score;
+- applying individual tags to sports teams and games;
 - previewing and importing NFL schedule CSV in
   `week,start_time,away_team_short_name,home_team_short_name` format;
 - viewing all picks, including invalidated picks, by league and week;

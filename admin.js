@@ -107,6 +107,7 @@ function page(title, content, notice, noticeType = 'success') {
 <body>
   <header><strong>Metagame admin</strong><nav>
     <a href="/admin/games">Games & scores</a>
+    <a href="/admin/teams">Teams & tags</a>
     <a href="/admin/schedule">Schedule import</a>
     <a href="/admin/picks">Picks</a>
     <a href="/admin/leagues">Leagues</a>
@@ -139,6 +140,14 @@ function validSeason(value) {
   const season = String(value ?? '').trim();
   if (!/^\d{4}$/.test(season)) throw new AdminInputError('Season must be a four-digit year.');
   return Number(season);
+}
+
+function validTag(value) {
+  const tag = String(value ?? '').trim().toLowerCase();
+  if (!/^[a-z][a-z0-9_]{0,63}$/.test(tag)) {
+    throw new AdminInputError('Tags must start with a letter and contain only lowercase letters, numbers, and underscores.');
+  }
+  return tag;
 }
 
 function validTimestamp(value) {
@@ -224,13 +233,74 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
 
   router.get('/games/:id/edit', async (req, res) => {
     const id = requiredInteger(req.params.id, 'Game ID');
-    const [game, teams] = await Promise.all([
+    const [game, teams, tags] = await Promise.all([
       db('sports_games').where({ id }).first(),
-      db('teams').select('*').orderBy('short_name')
+      db('teams').select('*').orderBy('short_name'),
+      db('sports_game_tags').where({ game_id: id }).orderBy('tag')
     ]);
     if (!game) return res.status(404).send(page('Game not found', '<p>No game has that ID.</p>'));
-    const content = gameForm(game, teams, `/admin/games/${id}`, 'Save game');
+    const content = gameForm(game, teams, `/admin/games/${id}`, 'Save game', tags);
     res.send(page(`Edit game ${id}`, content, req.query.notice, req.query.notice_type));
+  });
+
+  router.post('/games/:id/tags', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Game ID');
+    const tag = validTag(req.body.tag);
+    if (!(await db('sports_games').where({ id }).first())) throw new AdminInputError('Game not found.');
+    const existing = await db('sports_game_tags').where({ game_id: id, tag }).first();
+    if (existing) throw new AdminInputError('That game already has this tag.');
+    await db('sports_game_tags').insert({ game_id: id, tag });
+    redirectWithNotice(res, `/admin/games/${id}/edit`, `Added ${tag} tag.`);
+  });
+
+  router.post('/games/:id/tags/:tag/remove', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Game ID');
+    const tag = validTag(req.params.tag);
+    if (!(await db('sports_games').where({ id }).first())) throw new AdminInputError('Game not found.');
+    await db('sports_game_tags').where({ game_id: id, tag }).delete();
+    redirectWithNotice(res, `/admin/games/${id}/edit`, `Removed ${tag} tag.`);
+  });
+
+  router.get('/teams', async (req, res) => {
+    const [teams, tags] = await Promise.all([
+      db('teams').select('*').orderBy('short_name'),
+      db('sports_team_tags').select('*').orderBy(['team_id', 'tag'])
+    ]);
+    const tagsByTeam = new Map();
+    for (const tag of tags) {
+      if (!tagsByTeam.has(tag.team_id)) tagsByTeam.set(tag.team_id, []);
+      tagsByTeam.get(tag.team_id).push(tag.tag);
+    }
+    const rows = teams.map(team => {
+      const teamTags = tagsByTeam.get(team.id) || [];
+      const tagHtml = teamTags.length
+        ? teamTags.map(tag => `<form style="display:inline" method="post" action="/admin/teams/${team.id}/tags/${encodeURIComponent(tag)}/remove" onsubmit="return confirm('Remove this tag?')"><button type="submit">${escapeHtml(tag)} ×</button></form>`).join(' ')
+        : '<span class="muted">No tags</span>';
+      return `<tr><td>${escapeHtml(team.name)}</td><td><code>${escapeHtml(team.short_name)}</code></td><td>${tagHtml}</td><td>
+        <form class="form-grid" method="post" action="/admin/teams/${team.id}/tags"><label>Add tag<input name="tag" pattern="[a-z][a-z0-9_]*" maxlength="64" required placeholder="bird"></label><button type="submit">Add</button></form>
+      </td></tr>`;
+    }).join('');
+    const content = `<p class="muted">Tags use lowercase letters, numbers, and underscores. Each action adds or removes one tag from one team.</p>
+      <div class="table-wrap"><table><thead><tr><th>Team</th><th>Short name</th><th>Tags</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4">No teams found.</td></tr>'}</tbody></table></div>`;
+    res.send(page('Teams and tags', content, req.query.notice, req.query.notice_type));
+  });
+
+  router.post('/teams/:id/tags', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Team ID');
+    const tag = validTag(req.body.tag);
+    if (!(await db('teams').where({ id }).first())) throw new AdminInputError('Team not found.');
+    const existing = await db('sports_team_tags').where({ team_id: id, tag }).first();
+    if (existing) throw new AdminInputError('That team already has this tag.');
+    await db('sports_team_tags').insert({ team_id: id, tag });
+    redirectWithNotice(res, '/admin/teams', `Added ${tag} tag.`);
+  });
+
+  router.post('/teams/:id/tags/:tag/remove', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Team ID');
+    const tag = validTag(req.params.tag);
+    if (!(await db('teams').where({ id }).first())) throw new AdminInputError('Team not found.');
+    await db('sports_team_tags').where({ team_id: id, tag }).delete();
+    redirectWithNotice(res, '/admin/teams', `Removed ${tag} tag.`);
   });
 
   router.post('/games', async (req, res) => {
@@ -555,9 +625,15 @@ function gameKey(game) {
   ].join('|');
 }
 
-function gameForm(game, teams, action, submitLabel) {
+function gameForm(game, teams, action, submitLabel, tags = []) {
   const season = game?.season ?? process.env.CURRENT_SEASON ?? '';
   const teamOptions = selected => teams.map(team => option(team.short_name, `${team.name} (${team.short_name})`, selected)).join('');
+  const tagHtml = game
+    ? `<div class="panel"><h2>Game tags</h2><p class="muted">Each action adds or removes one tag.</p>
+        <p>${tags.length ? tags.map(row => `<form style="display:inline" method="post" action="/admin/games/${game.id}/tags/${encodeURIComponent(row.tag)}/remove" onsubmit="return confirm('Remove this tag?')"><button type="submit">${escapeHtml(row.tag)} ×</button></form>`).join(' ') : '<span class="muted">No tags</span>'}</p>
+        <form class="form-grid" method="post" action="/admin/games/${game.id}/tags"><label>Add tag<input name="tag" pattern="[a-z][a-z0-9_]*" maxlength="64" required placeholder="thanksgiving"></label><button type="submit">Add tag</button></form>
+      </div>`
+    : '';
   return `<div class="panel"><form class="form-grid" method="post" action="${escapeHtml(action)}">
     <label>Season<input name="season" pattern="[0-9]{4}" required value="${escapeHtml(season)}"></label>
     <label>Week<input name="week" type="number" min="1" max="25" required value="${escapeHtml(game?.week ?? '')}"></label>
@@ -567,7 +643,7 @@ function gameForm(game, teams, action, submitLabel) {
     <label>Away score<input name="away_team_score" type="number" min="0" value="${escapeHtml(game?.away_team_score ?? '')}"></label>
     <label>Home score<input name="home_team_score" type="number" min="0" value="${escapeHtml(game?.home_team_score ?? '')}"></label>
     <button type="submit">${escapeHtml(submitLabel)}</button>
-  </form></div><p><a href="/admin/games?season=${escapeHtml(season)}">Back to games</a></p>`;
+  </form></div>${tagHtml}<p><a href="/admin/games?season=${escapeHtml(season)}">Back to games</a></p>`;
 }
 
 function scheduleForm(season = process.env.CURRENT_SEASON ?? '', csv = '') {
