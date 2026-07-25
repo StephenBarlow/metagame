@@ -35,6 +35,7 @@
     "email-validator": "^2.0.4",
     "express": "^5.2.1",
     "graphql": "^16.14.2",
+    "iconify-icon": "^3.0.2",
     "knex": "^3.3.0",
     "pg": "^8.12.0"
   }

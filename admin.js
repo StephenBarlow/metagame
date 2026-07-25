@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const emailValidator = require('email-validator');
 const parseCsv = require('csv-parse/lib/sync');
+const path = require('path');
 
 class AdminInputError extends Error {}
 
@@ -44,7 +45,7 @@ function adminAuthentication(options = {}) {
     res.set('X-Content-Type-Options', 'nosniff');
     res.set('X-Frame-Options', 'DENY');
     res.set('Referrer-Policy', 'same-origin');
-    res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+    res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src https://api.iconify.design; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
 
     if (!expectedPassword) {
       return res.status(503).send('Admin access is disabled because ADMIN_PASSWORD is not configured.');
@@ -103,6 +104,7 @@ function page(title, content, notice, noticeType = 'success') {
     .table-wrap { overflow-x: auto; border: 1px solid #d8dee8; border-radius: 8px; }
     code { background: #edf1f6; padding: .1rem .25rem; }
   </style>
+  <script type="module" src="/admin/iconify-icon.js"></script>
 </head>
 <body>
   <header><strong>Metagame admin</strong><nav>
@@ -197,6 +199,10 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
 
   router.use(adminAuthentication(auth));
   router.use(express.urlencoded({ extended: false, limit: '2mb' }));
+  router.get('/iconify-icon.js', (req, res) => {
+    res.type('application/javascript');
+    res.sendFile(path.join(__dirname, 'node_modules/iconify-icon/dist/iconify-icon.mjs'));
+  });
   router.use((req, res, next) => {
     if (req.method !== 'POST') return next();
     const origin = req.get('origin');
@@ -541,11 +547,12 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     const rows = achievements.map(achievement => `<tr>
       <td><code>${escapeHtml(achievement.key)}</code></td>
       <td>${escapeHtml(achievement.name)}</td>
+      <td>${achievement.icon_id ? `<iconify-icon icon="${escapeHtml(achievement.icon_id)}" mode="svg" width="1.5em" height="1.5em" aria-label="${escapeHtml(achievement.name)}"></iconify-icon> <code>${escapeHtml(achievement.icon_id)}</code>` : '<span class="muted">—</span>'}</td>
       <td>${achievement.active ? 'Active' : 'Inactive'}</td>
       <td><a href="/admin/achievements/${achievement.id}/edit">Edit</a></td>
     </tr>`).join('');
     const content = `<p class="muted">Achievement keys and evaluation settings are read-only here.</p>
-      <div class="table-wrap"><table><thead><tr><th>Key</th><th>Name</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4">No achievements found.</td></tr>'}</tbody></table></div>`;
+      <div class="table-wrap"><table><thead><tr><th>Key</th><th>Name</th><th>Icon ID</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5">No achievements found.</td></tr>'}</tbody></table></div>`;
     res.send(page('Achievements', content, req.query.notice, req.query.notice_type));
   });
 
