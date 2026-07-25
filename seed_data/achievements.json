@@ -514,5 +514,89 @@
     "condition_config": { "requirements": [{ "match": { "short_name": "CLE" }, "count": 1 }, { "match": { "short_name": "CHI" }, "count": 1 }] },
     "repeatable": false,
     "active": true
+  },
+  {
+    "key": "BIRD_BRAIN",
+    "name": "Bird Brain",
+    "description": "For the second time in a season, pick two teams with bird mascots.",
+    "icon_id": null,
+    "evaluator": "seasonalThreshold",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_season",
+    "condition_config": { "base_evaluator": "teamCombination", "minimum_occurrences": 2, "requirements": [{ "match": { "tag": "bird" }, "count": 2 }] },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "TOXOPLASMOSIS",
+    "name": "Toxoplasmosis",
+    "description": "For the second time in a season, pick two teams with cat mascots.",
+    "icon_id": null,
+    "evaluator": "seasonalThreshold",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_season",
+    "condition_config": { "base_evaluator": "teamCombination", "minimum_occurrences": 2, "requirements": [{ "match": { "tag": "cat" }, "count": 2 }] },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "COUNTRY_AND_WESTERN",
+    "name": "Country and Western",
+    "description": "Pick the Titans and Cowboys in the same week.",
+    "icon_id": null,
+    "evaluator": "teamCombination",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_week",
+    "condition_config": { "requirements": [{ "match": { "short_name": "TEN" }, "count": 1 }, { "match": { "short_name": "DAL" }, "count": 1 }] },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "LOCAL_MAXIMUM",
+    "name": "Local Maximum",
+    "description": "Score the highest possible number of points in a given week.",
+    "icon_id": null,
+    "evaluator": "maximumPossibleScore",
+    "evaluation_phase": "week_finalized",
+    "scope": "player_week",
+    "condition_config": { "is_maximum_possible_score": true },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "FEE_FI_FO_FUM",
+    "name": "Fee-fi-fo-fum",
+    "description": "Pick the Giants and Titans in the same week.",
+    "icon_id": null,
+    "evaluator": "teamCombination",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_week",
+    "condition_config": { "requirements": [{ "match": { "short_name": "NYG" }, "count": 1 }, { "match": { "short_name": "TEN" }, "count": 1 }] },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "FAMILY_MANNING",
+    "name": "Family Manning",
+    "description": "In a single week, pick any two of the Colts, Giants, and Saints.",
+    "icon_id": null,
+    "evaluator": "teamCombination",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_week",
+    "condition_config": { "requirements": [{ "any_match": [{ "short_name": "IND" }, { "short_name": "NYG" }, { "short_name": "NO" }], "count": 2 }] },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "GOOD_AND_EVIL",
+    "name": "Good and Evil",
+    "description": "Pick the Saints and Raiders in the same week.",
+    "icon_id": null,
+    "evaluator": "teamCombination",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_week",
+    "condition_config": { "requirements": [{ "match": { "short_name": "NO" }, "count": 1 }, { "match": { "short_name": "LV" }, "count": 1 }] },
+    "repeatable": false,
+    "active": true
   }
 ]
