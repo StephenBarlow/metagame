@@ -151,6 +151,15 @@ function validTag(value) {
   return tag;
 }
 
+function validIconID(value) {
+  const iconID = String(value ?? '').trim();
+  if (!iconID) return null;
+  if (iconID.length > 255 || !/^[^:\s]+:[^:\s]+$/.test(iconID)) {
+    throw new AdminInputError('Icon ID must use the Iconify prefix:name format.');
+  }
+  return iconID;
+}
+
 function validTimestamp(value) {
   const timestamp = String(value ?? '').trim();
   if (!/(Z|[+-]\d{2}:\d{2})$/i.test(timestamp)) {
@@ -552,19 +561,15 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     if (!(await db('achievements').where({ id }).first())) throw new AdminInputError('Achievement not found.');
     const name = String(req.body.name ?? '').trim();
     const description = String(req.body.description ?? '').trim();
-    const imageURL = String(req.body.image_url ?? '').trim();
+    const iconID = validIconID(req.body.icon_id);
     if (!name) throw new AdminInputError('Achievement name is required.');
     if (name.length > 255) throw new AdminInputError('Achievement name must be 255 characters or fewer.');
     if (!description) throw new AdminInputError('Achievement description is required.');
     if (description.length > 10000) throw new AdminInputError('Achievement description must be 10,000 characters or fewer.');
-    if (imageURL.length > 2048) throw new AdminInputError('Image URL must be 2,048 characters or fewer.');
-    if (imageURL && !/^(https?:\/\/|\/)/i.test(imageURL)) {
-      throw new AdminInputError('Image URL must be an http(s) URL or an application-relative path.');
-    }
     await db('achievements').where({ id }).update({
       name,
       description,
-      image_url: imageURL || null,
+      icon_id: iconID,
       active: req.body.active === 'on'
     });
     redirectWithNotice(res, `/admin/achievements/${id}/edit`, 'Achievement updated.');
@@ -696,7 +701,7 @@ function achievementForm(achievement) {
     <p><strong>Evaluator:</strong> <code>${escapeHtml(achievement.evaluator)}</code> · <strong>Phase:</strong> <code>${escapeHtml(achievement.evaluation_phase)}</code> · <strong>Scope:</strong> <code>${escapeHtml(achievement.scope)}</code></p>
     <label>Name<input name="name" maxlength="255" required value="${escapeHtml(achievement.name)}"></label>
     <label>Description<textarea name="description" maxlength="10000" required>${escapeHtml(achievement.description)}</textarea></label>
-    <label>Image URL<input name="image_url" maxlength="2048" value="${escapeHtml(achievement.image_url ?? '')}" placeholder="https://… or /images/…"></label>
+    <label>Iconify ID<input name="icon_id" maxlength="255" value="${escapeHtml(achievement.icon_id ?? '')}" placeholder="tabler:number-33-small"></label>
     <label><input name="active" type="checkbox"${achievement.active ? ' checked' : ''}> Active</label>
     <button type="submit">Save achievement</button>
   </form></div><p><a href="/admin/achievements">Back to achievements</a></p>`;
