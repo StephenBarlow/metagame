@@ -422,12 +422,12 @@
   {
     "key": "WORLD_TRAVELER",
     "name": "World Traveler",
-    "description": "Pick a team from a game that's played outside the United States.",
+    "description": "Twice this season, pick a team from a game that's played outside the United States.",
     "icon_id": null,
-    "evaluator": "gameTagCombination",
+    "evaluator": "seasonalThreshold",
     "evaluation_phase": "pick_locked",
-    "scope": "player_week",
-    "condition_config": { "tag": "international", "picked_team_count_at_least": 1 },
+    "scope": "player_season",
+    "condition_config": { "base_evaluator": "gameTagCombination", "minimum_occurrences": 2, "occurrence_unit": "picked_team", "tag": "international", "picked_team_count_at_least": 1 },
     "repeatable": false,
     "active": true
   },

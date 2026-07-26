@@ -9,6 +9,7 @@
   },
   "packageManager": "bun@1.3.9",
   "scripts": {
+    "achievements:evaluate": "bun jobs/evaluate-achievements.js",
     "start": "bun index.js",
     "test": "bun test"
   },

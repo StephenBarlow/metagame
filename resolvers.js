@@ -487,6 +487,10 @@ function leagueFromRow(row) {
 }
 
 function effectiveLeagueWeek(league, column, environmentVariable, fallback) {
+  if (league?.[column] === null || league?.[column] === undefined || league?.[column] === '') {
+    const environmentWeek = Number(process.env[environmentVariable]);
+    return Number.isInteger(environmentWeek) ? environmentWeek : fallback;
+  }
   const leagueWeek = Number(league?.[column]);
   if (Number.isInteger(leagueWeek)) return leagueWeek;
   const environmentWeek = Number(process.env[environmentVariable]);
@@ -527,3 +531,4 @@ function gamesFromRows(rows, allTeams) {
 }
 
 exports.resolvers = resolvers;
+exports.effectiveLeagueWeek = effectiveLeagueWeek;
