@@ -165,6 +165,27 @@ class PGDB {
       });
   }
 
+  achievementAwardsForLeagueQuery(leagueID) {
+    return this.knex('achievement_awards')
+      .select([
+        'achievement_awards.id as award_id',
+        'achievement_awards.league_id',
+        'achievement_awards.user_id',
+        'achievement_awards.week',
+        'achievement_awards.awarded_at',
+        'achievements.id as achievement_id',
+        'achievements.key as achievement_key',
+        'achievements.name as achievement_name',
+        'achievements.description as achievement_description',
+        'achievements.icon_id as achievement_icon_id'
+      ])
+      .innerJoin('achievements', 'achievements.id', 'achievement_awards.achievement_id')
+      .where('achievement_awards.league_id', leagueID)
+      .orderBy('achievement_awards.week', 'desc')
+      .orderBy('achievement_awards.awarded_at', 'desc')
+      .orderBy('achievement_awards.id', 'desc');
+  }
+
   leagueOwnerQuery(leagueID, ownerID) {
     return this.knex
       .select('*')
@@ -416,6 +437,12 @@ class PGDB {
       MINUTE
     );
     return val;
+  }
+
+  async getAchievementAwardsForLeague(leagueID) {
+    // Award rows are written by the one-off evaluator outside this process, so
+    // deliberately do not cache this query here.
+    return this.achievementAwardsForLeagueQuery(leagueID);
   }
 
   async getPicksForLeague(leagueID, leagueConcluded = false, revealedWeek) {

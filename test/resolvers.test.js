@@ -149,3 +149,64 @@ test('setFavoriteTeam rejects a replacement choice', async (t) => {
   }]);
   assert.equal(called, false);
 });
+
+test('league achievement awards include the recipient, unlock week, and full achievement definition', async (t) => {
+  const originalSeason = process.env.CURRENT_SEASON;
+  process.env.CURRENT_SEASON = '2026';
+  t.after(() => { process.env.CURRENT_SEASON = originalSeason; });
+
+  const server = new ApolloServer({ typeDefs, resolvers });
+  t.after(() => server.stop());
+  const response = await server.executeOperation({
+    query: `query LeagueAwards($leagueID: ID!, $userID: ID!) {
+      league(leagueID: $leagueID) {
+        achievementAwards {
+          id
+          week
+          awardedAt
+          user { id displayName(leagueID: $userID) }
+          achievement { id key name description iconId }
+        }
+      }
+    }`,
+    variables: { leagueID: '2', userID: '1' }
+  }, {
+    contextValue: {
+      dataSources: {
+        pg: {
+          getLeagueById: async () => ({ id: 2, name: 'Test League', season: '2026', game_mode: 'PICK_TWO', owner_id: 1 }),
+          getLeagueMembers: async () => [{ user_id: 1, league_id: 2, email: 'test@example.com', display_name: 'Player' }],
+          getTeams: async () => [],
+          getPicksForLeague: async () => [],
+          getAchievementAwardsForLeague: async () => [{
+            award_id: 7,
+            user_id: 1,
+            league_id: 2,
+            week: 4,
+            awarded_at: '2026-10-01T00:00:00.000Z',
+            achievement_id: 3,
+            achievement_key: 'BEST_WEEK_EVER',
+            achievement_name: 'Best Week Ever',
+            achievement_description: 'Achieve a double-win with your favorite team.',
+            achievement_icon_id: 'tabler:trophy'
+          }]
+        }
+      }
+    }
+  });
+
+  assert.equal(response.body.kind, 'single');
+  assert.deepEqual(JSON.parse(JSON.stringify(response.body.singleResult.data.league.achievementAwards)), [{
+    id: '7',
+    week: 4,
+    awardedAt: '2026-10-01T00:00:00.000Z',
+    user: { id: '1', displayName: 'Player' },
+    achievement: {
+      id: '3',
+      key: 'BEST_WEEK_EVER',
+      name: 'Best Week Ever',
+      description: 'Achieve a double-win with your favorite team.',
+      iconId: 'tabler:trophy'
+    }
+  }]);
+});

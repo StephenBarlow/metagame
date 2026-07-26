@@ -72,10 +72,27 @@ type FantasyLeague {
   owner: User!
   users: [User!]
   picks: [Pick!]
+  achievementAwards: [AchievementAward!]!
   gameMode: GameMode!
   currentWeek: Int!
   revealedWeek: Int!
   season: String!
+}
+
+type Achievement {
+  id: ID!
+  key: String!
+  name: String!
+  description: String!
+  iconId: String
+}
+
+type AchievementAward {
+  id: ID!
+  week: Int!
+  awardedAt: String!
+  user: User!
+  achievement: Achievement!
 }
 
 input CreateFantasyLeagueRequest {

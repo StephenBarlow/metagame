@@ -20,10 +20,11 @@ const resolvers = {
       }
     },
     async league(parent, { leagueID }, context, info) {
-      let [league, users, teams] = await Promise.all([
+      let [league, users, teams, awards] = await Promise.all([
         context.dataSources.pg.getLeagueById(leagueID),
         context.dataSources.pg.getLeagueMembers(leagueID),
-        context.dataSources.pg.getTeams()
+        context.dataSources.pg.getTeams(),
+        context.dataSources.pg.getAchievementAwardsForLeague(leagueID)
       ]);
       let picks;
       const revealedWeek = effectiveLeagueWeek(league, 'revealed_week', 'REVEALED_WEEK', 0);
@@ -35,6 +36,7 @@ const resolvers = {
       context.picks = picks;
       context.users = users;
       context.teams = teams;
+      context.awards = awards;
       return leagueFromRow(league);
     },
     async leagues(parent, { userID }, { dataSources }, info) {
@@ -237,6 +239,10 @@ const resolvers = {
         throw new Error('Pick list not found');
       }
 
+    },
+    async achievementAwards(league, args, { dataSources, awards }) {
+      const rows = awards || await dataSources.pg.getAchievementAwardsForLeague(league.id);
+      return rows.map(achievementAwardFromRow);
     }
   },
   Pick: {
@@ -280,6 +286,18 @@ const resolvers = {
         }
       }
     },
+  },
+  AchievementAward: {
+    async user(award, args, context) {
+      if (context.users) {
+        return userFromRow(context.users.find(user => String(user.user_id) === String(award.userID)));
+      }
+      const users = await context.dataSources.pg.getLeagueMembers(award.leagueID);
+      return userFromRow(users.find(user => String(user.user_id) === String(award.userID)));
+    },
+    achievement(award) {
+      return award.achievement;
+    }
   },
   User: {
     async fantasyLeagues(user, args, { dataSources }, info) {
@@ -515,6 +533,23 @@ function pickFromRow(row) {
     leagueID: row.league_id,
     teamID: row.team_id
   }
+}
+
+function achievementAwardFromRow(row) {
+  return {
+    id: row.award_id,
+    week: row.week,
+    awardedAt: new Date(row.awarded_at).toISOString(),
+    userID: row.user_id,
+    leagueID: row.league_id,
+    achievement: {
+      id: row.achievement_id,
+      key: row.achievement_key,
+      name: row.achievement_name,
+      description: row.achievement_description,
+      iconId: row.achievement_icon_id
+    }
+  };
 }
 
 function userFromRow(row) {
