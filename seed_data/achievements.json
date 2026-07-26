@@ -598,5 +598,65 @@
     "condition_config": { "requirements": [{ "match": { "short_name": "NO" }, "count": 1 }, { "match": { "short_name": "LV" }, "count": 1 }] },
     "repeatable": false,
     "active": true
+  },
+  {
+    "key": "DESPERADO",
+    "name": "Desperado",
+    "description": "Pick the Cowboys and Eagles in the same week.",
+    "icon_id": null,
+    "evaluator": "teamCombination",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_week",
+    "condition_config": { "requirements": [{ "match": { "short_name": "DAL" }, "count": 1 }, { "match": { "short_name": "PHI" }, "count": 1 }] },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "VATICAN_CITY",
+    "name": "Vatican City",
+    "description": "Pick the Cardinals and Saints in the same week.",
+    "icon_id": null,
+    "evaluator": "teamCombination",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_week",
+    "condition_config": { "requirements": [{ "match": { "short_name": "ARI" }, "count": 1 }, { "match": { "short_name": "NO" }, "count": 1 }] },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "HIGH_ALTITUDE",
+    "name": "High Altitude",
+    "description": "Pick the Broncos and Jets in the same week.",
+    "icon_id": null,
+    "evaluator": "teamCombination",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_week",
+    "condition_config": { "requirements": [{ "match": { "short_name": "DEN" }, "count": 1 }, { "match": { "short_name": "NYJ" }, "count": 1 }] },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "HOT_STREAK",
+    "name": "Hot Streak",
+    "description": "Score points for eight consecutive weeks (ignoring byes).",
+    "icon_id": null,
+    "evaluator": "resultStreak",
+    "evaluation_phase": "week_finalized",
+    "scope": "player_season",
+    "condition_config": { "qualifying_results": ["double_win", "double_loss"], "consecutive_weeks": 8, "ignore_bye_weeks": true },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "COLD_STREAK",
+    "name": "Cold Streak",
+    "description": "Split for eight consecutive weeks (ignoring byes).",
+    "icon_id": null,
+    "evaluator": "resultStreak",
+    "evaluation_phase": "week_finalized",
+    "scope": "player_season",
+    "condition_config": { "qualifying_results": ["split"], "consecutive_weeks": 8, "ignore_bye_weeks": true },
+    "repeatable": false,
+    "active": true
   }
 ]
