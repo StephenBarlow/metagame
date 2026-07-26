@@ -217,10 +217,10 @@ The job has two modes:
 
 - `pick-locked` evaluates `pick_locked` achievements. With no explicit
   `--week`, it evaluates the league's effective revealed week.
-- `week-finalized` evaluates `week_finalized` achievements. With no explicit
-  `--week`, it evaluates the week immediately before the league's effective
-  current week. When that is the final scheduled week, it also evaluates
-  `season_finalized` achievements.
+- `week-finalized` reconciles both `pick_locked` and `week_finalized`
+  achievements. With no explicit `--week`, it evaluates the week immediately
+  before the league's effective current week. When that is the final scheduled
+  week, it also evaluates `season_finalized` achievements.
 
 Both modes accept `--week N` and `--dry-run`. A run processes one league,
 skips concluded leagues, and rejects weeks that have not reached the requested
@@ -235,3 +235,9 @@ week-specific award key. Consequently, retrying the same one-off job is safe.
 If a league has explicit rows in `league_achievements`, only active associated
 definitions are evaluated. Until associations are configured for a league,
 all globally active definitions are treated as enabled.
+
+When a league's week settings are changed in the admin panel, advancing its
+revealed week starts a `pick-locked` one-off job. Advancing its current week
+starts a `week-finalized` reconciliation job for the prior week. Configure the
+API service with `RENDER_API_KEY` and `RENDER_BASE_SERVICE_ID` to enable those
+job launches; `RENDER_ONE_OFF_JOB_PLAN_ID` is optional.

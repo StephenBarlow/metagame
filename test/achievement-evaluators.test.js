@@ -7,8 +7,10 @@ const { buildEvaluationContext } = require('../achievements/context');
 const { evaluateAchievement, maximumPossibleScore } = require('../achievements/evaluators');
 const { calculatePickTwoResult } = require('../achievements/scoring');
 const { parseArguments } = require('../jobs/evaluate-achievements');
-const { integerOrFallback } = require('../achievements/engine');
+const { integerOrFallback, MODES } = require('../achievements/engine');
 const { effectiveLeagueWeek } = require('../resolvers');
+const { achievementEvaluationCommand, createRenderOneOffJob } = require('../render-one-off-jobs');
+const { achievementJobsForWeekSettings } = require('../admin');
 const achievementDefinitions = require('../seed_data/achievements.json');
 
 function contextFixture(overrides = {}) {
@@ -170,6 +172,44 @@ test('one-off job arguments support both Render-friendly value forms', () => {
     parseArguments(['pick-locked', '--league-id=4', '--week', '7', '--dry-run']),
     { mode: 'pick-locked', leagueId: '4', week: '7', dryRun: true }
   );
+});
+
+test('a finalized-week run reconciles locked-pick awards too', () => {
+  assert.deepEqual(MODES['week-finalized'], ['pick_locked', 'week_finalized']);
+});
+
+test('Render job requests use a constrained achievement command', async () => {
+  assert.equal(
+    achievementEvaluationCommand('week-finalized', 42, 7),
+    'bun run achievements:evaluate -- week-finalized --league-id 42 --week 7'
+  );
+  let request;
+  const job = await createRenderOneOffJob('echo test', {
+    apiKey: 'test-key',
+    serviceId: 'srv-test',
+    planId: 'plan-srv-006',
+    fetch: async (url, options) => {
+      request = { url, options };
+      return { ok: true, json: async () => ({ id: 'job-test' }) };
+    }
+  });
+  assert.equal(job.id, 'job-test');
+  assert.equal(request.url, 'https://api.render.com/v1/services/srv-test/jobs');
+  assert.deepEqual(JSON.parse(request.options.body), {
+    startCommand: 'echo test',
+    planId: 'plan-srv-006'
+  });
+});
+
+test('week setting advances launch the reveal and final reconciliation jobs', () => {
+  assert.deepEqual(
+    achievementJobsForWeekSettings(7, 7, 8, 8),
+    [
+      { mode: 'pick-locked', week: 8 },
+      { mode: 'week-finalized', week: 7 }
+    ]
+  );
+  assert.deepEqual(achievementJobsForWeekSettings(8, 8, 8, 8), []);
 });
 
 test('nullable league week values fall back instead of becoming zero', () => {

@@ -5,7 +5,7 @@ const { evaluateAchievement } = require('./evaluators');
 
 const MODES = {
   'pick-locked': ['pick_locked'],
-  'week-finalized': ['week_finalized']
+  'week-finalized': ['pick_locked', 'week_finalized']
 };
 
 function integerOrFallback(value, fallback) {

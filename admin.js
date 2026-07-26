@@ -3,6 +3,7 @@ const express = require('express');
 const emailValidator = require('email-validator');
 const parseCsv = require('csv-parse/lib/sync');
 const path = require('path');
+const { startAchievementEvaluationJob } = require('./render-one-off-jobs');
 
 class AdminInputError extends Error {}
 
@@ -142,6 +143,25 @@ function nullableScore(value, label) {
 function nullableWeek(value, label, minimum = 0) {
   if (value === '' || value === undefined || value === null) return null;
   return requiredInteger(value, label, minimum, 25);
+}
+
+function effectiveWeek(value, environmentVariable, fallback) {
+  if (value === null || value === undefined || value === '') {
+    const environmentValue = Number(process.env[environmentVariable]);
+    return Number.isInteger(environmentValue) ? environmentValue : fallback;
+  }
+  return Number(value);
+}
+
+function achievementJobsForWeekSettings(previousCurrentWeek, previousRevealedWeek, nextCurrentWeek, nextRevealedWeek) {
+  const jobs = [];
+  if (nextRevealedWeek > previousRevealedWeek) {
+    jobs.push({ mode: 'pick-locked', week: nextRevealedWeek });
+  }
+  if (nextCurrentWeek > previousCurrentWeek) {
+    jobs.push({ mode: 'week-finalized', week: previousCurrentWeek });
+  }
+  return jobs;
 }
 
 function validSeason(value) {
@@ -524,13 +544,38 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     const revealedWeek = nullableWeek(req.body.revealed_week, 'Revealed week', 0);
     const league = await db('fantasy_leagues').where({ id: leagueID }).first();
     if (!league) throw new AdminInputError('League not found.');
+    const previousCurrentWeek = effectiveWeek(league.current_week, 'CURRENT_WEEK', 1);
+    const previousRevealedWeek = effectiveWeek(league.revealed_week, 'REVEALED_WEEK', 0);
+    const nextCurrentWeek = effectiveWeek(currentWeek, 'CURRENT_WEEK', 1);
+    const nextRevealedWeek = effectiveWeek(revealedWeek, 'REVEALED_WEEK', 0);
     await db('fantasy_leagues').where({ id: leagueID }).update({
       current_week: currentWeek,
       revealed_week: revealedWeek
     });
     await pg.invalidateLeagueCache(leagueID);
     await pg.invalidateLeaguePicksCache(leagueID);
-    redirectWithNotice(res, `/admin/leagues/${leagueID}`, 'League week settings updated.');
+
+    const jobs = achievementJobsForWeekSettings(
+      previousCurrentWeek,
+      previousRevealedWeek,
+      nextCurrentWeek,
+      nextRevealedWeek
+    );
+
+    try {
+      const startedJobs = (await Promise.all(jobs.map(job =>
+        startAchievementEvaluationJob(job.mode, leagueID, job.week)
+      ))).filter(Boolean);
+      const jobNotice = startedJobs.length
+        ? ` Started ${startedJobs.length} achievement evaluation job${startedJobs.length === 1 ? '' : 's'}.`
+        : jobs.length
+          ? ' Achievement evaluation was not started because Render job credentials are not configured.'
+          : '';
+      redirectWithNotice(res, `/admin/leagues/${leagueID}`, `League week settings updated.${jobNotice}`);
+    } catch (error) {
+      logger.error(error, 'Failed to start achievement evaluation job');
+      redirectWithNotice(res, `/admin/leagues/${leagueID}`, 'League week settings updated, but starting the achievement evaluation job failed. Check the service logs.', 'error');
+    }
   });
 
   router.post('/leagues/:id/members', async (req, res) => {
@@ -750,6 +795,7 @@ function scheduleForm(season = process.env.CURRENT_SEASON ?? '', csv = '') {
 
 module.exports = {
   AdminInputError,
+  achievementJobsForWeekSettings,
   adminAuthentication,
   createAdminRouter,
   parseScheduleCsv,
