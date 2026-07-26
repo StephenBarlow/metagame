@@ -59,6 +59,7 @@ test('read methods build valid PostgreSQL queries without executing them', async
   await db.getUserByEmail('test@example.com');
   await db.getUserById(1);
   await db.getUserDisplayNameForLeague(1, 1);
+  await db.getMembership(1, 1);
   await db.getAllLeagues();
   await db.getLeaguesForUser(1);
   await db.getLeagueById(1);
@@ -70,7 +71,7 @@ test('read methods build valid PostgreSQL queries without executing them', async
   await db.getCurrentPick(1, 1, 1);
   await db.getPicksForMember(1, 1);
 
-  assert.equal(queries.length, 16);
+  assert.equal(queries.length, 17);
   assert.ok(queries.every(({ method }) => method === 'select'));
   assert.ok(queries.every(({ sql }) => sql.startsWith('select')));
 });
@@ -93,6 +94,20 @@ test('pick cache invalidation deletes each affected query once', async (t) => {
     delete: async (key) => deletedKeys.push(key)
   });
   t.after(() => db.knex.destroy());
+  const originalKnex = db.knex;
+  const knexProxy = function(table) {
+    if (table === 'fantasy_leagues') {
+      return {
+        select: () => ({
+          whereIn: async () => [{ id: 1, revealed_week: 6 }]
+        })
+      };
+    }
+    return originalKnex(table);
+  };
+  knexProxy.select = originalKnex.select.bind(originalKnex);
+  knexProxy.destroy = originalKnex.destroy.bind(originalKnex);
+  db.knex = knexProxy;
 
   const affectedPicks = [
     { league_id: 1, user_id: 2, week: 3 },

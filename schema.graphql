@@ -32,6 +32,7 @@ type User {
   id: ID!
   email: String!
   displayName(leagueID: ID!): String
+  favoriteTeam(leagueID: ID!): SportsTeam
   fantasyLeagues: [FantasyLeague!]
 }
 
@@ -51,6 +52,17 @@ input AddUserToFantasyLeagueRequest {
 
 type AddUserToFantasyLeagueResponse {
   league: FantasyLeague
+  errors: [Error!]
+}
+
+input SetFavoriteTeamRequest {
+  userID: ID!
+  leagueID: ID!
+  teamID: ID!
+}
+
+type SetFavoriteTeamResponse {
+  favoriteTeam: SportsTeam
   errors: [Error!]
 }
 
@@ -130,6 +142,7 @@ type Mutation {
   #createUser(request: CreateUserRequest!): CreateUserResponse
   #createFantasyLeague(request: CreateFantasyLeagueRequest!): CreateFantasyLeagueResponse
   #addUserToFantasyLeague(request: AddUserToFantasyLeagueRequest!): AddUserToFantasyLeagueResponse
+  setFavoriteTeam(request: SetFavoriteTeamRequest!): SetFavoriteTeamResponse
   submitPick(request: SubmitPickRequest!): SubmitPickResponse
   invalidatePicks(request: InvalidatePicksRequest!): InvalidatePicksResponse
   #createSportsGame(request: CreateSportsGameRequest!): CreateSportsGameResponse

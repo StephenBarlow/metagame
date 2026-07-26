@@ -80,3 +80,72 @@ test('submitPick rejects an identical active Pick 2 submission', async () => {
   });
   process.env.CURRENT_SEASON = originalSeason;
 });
+
+test('setFavoriteTeam stores a member\'s first valid league team choice', async (t) => {
+  const server = new ApolloServer({ typeDefs, resolvers });
+  t.after(() => server.stop());
+  let stored;
+  const contextValue = {
+    dataSources: {
+      pg: {
+        getLeagueById: async () => ({ id: 2, owner_id: 9, sports_league: 'NFL' }),
+        getTeamById: async () => ({ id: 3, name: 'Buffalo Bills', short_name: 'BUF', sports_league: 'NFL' }),
+        getMembership: async () => ({ user_id: 1, league_id: 2, favorite_team_id: null }),
+        setMembershipFavoriteTeam: async (...args) => {
+          stored = args;
+          return { user_id: 1, league_id: 2, favorite_team_id: 3 };
+        }
+      }
+    }
+  };
+
+  const response = await server.executeOperation({
+    query: `mutation SetFavoriteTeam($request: SetFavoriteTeamRequest!) {
+      setFavoriteTeam(request: $request) {
+        favoriteTeam { id name shortName }
+        errors { code message }
+      }
+    }`,
+    variables: { request: { userID: '1', leagueID: '2', teamID: '3' } }
+  }, { contextValue });
+
+  assert.equal(response.body.kind, 'single');
+  assert.deepEqual(JSON.parse(JSON.stringify(response.body.singleResult.data.setFavoriteTeam)), {
+    favoriteTeam: { id: '3', name: 'Buffalo Bills', shortName: 'BUF' },
+    errors: []
+  });
+  assert.deepEqual(stored, [1, 2, 3, 9]);
+});
+
+test('setFavoriteTeam rejects a replacement choice', async (t) => {
+  const server = new ApolloServer({ typeDefs, resolvers });
+  t.after(() => server.stop());
+  let called = false;
+  const response = await server.executeOperation({
+    query: `mutation {
+      setFavoriteTeam(request: { userID: 1, leagueID: 2, teamID: 3 }) {
+        favoriteTeam { id }
+        errors { code message }
+      }
+    }`
+  }, {
+    contextValue: {
+      dataSources: {
+        pg: {
+          getLeagueById: async () => ({ id: 2, sports_league: 'NFL' }),
+          getTeamById: async () => ({ id: 3, sports_league: 'NFL' }),
+          getMembership: async () => ({ favorite_team_id: 4 }),
+          setMembershipFavoriteTeam: async () => { called = true; }
+        }
+      }
+    }
+  });
+
+  assert.equal(response.body.kind, 'single');
+  assert.equal(response.body.singleResult.data.setFavoriteTeam.favoriteTeam, null);
+  assert.deepEqual(JSON.parse(JSON.stringify(response.body.singleResult.data.setFavoriteTeam.errors)), [{
+    code: 'ERR_INVALID_INPUT',
+    message: 'A favorite team has already been selected for this league.'
+  }]);
+  assert.equal(called, false);
+});

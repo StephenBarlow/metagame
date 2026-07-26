@@ -118,6 +118,18 @@ class PGDB {
       .limit(1);
   }
 
+  membershipQuery(userID, leagueID) {
+    return this.knex
+      .select('*')
+      .from('memberships')
+      .where({
+        user_id: userID,
+        league_id: leagueID,
+        revoked_at: null
+      })
+      .limit(1);
+  }
+
   allLeaguesQuery() {
     return this.knex
       .select('*')
@@ -239,7 +251,8 @@ class PGDB {
     const queries = [
       this.leagueMembersQuery(leagueID),
       this.leaguesForUserQuery(userID),
-      this.userDisplayNameForLeagueQuery(userID, leagueID)
+      this.userDisplayNameForLeagueQuery(userID, leagueID),
+      this.membershipQuery(userID, leagueID)
     ];
     if (String(userID) === String(ownerID)) {
       queries.push(this.leagueOwnerQuery(leagueID, ownerID));
@@ -307,6 +320,25 @@ class PGDB {
     if (val.length) {
       return val[0];
     }
+  }
+
+  async getMembership(userID, leagueID) {
+    const val = await this.cacheQuery(
+      this.membershipQuery(userID, leagueID),
+      MINUTE
+    );
+    if (val.length) return val[0];
+  }
+
+  async setMembershipFavoriteTeam(userID, leagueID, teamID, ownerID) {
+    const updated = await this.knex('memberships')
+      .where({ user_id: userID, league_id: leagueID, revoked_at: null })
+      .whereNull('favorite_team_id')
+      .update({ favorite_team_id: teamID })
+      .returning('*');
+    if (!updated.length) return null;
+    await this.invalidateMembershipCache(userID, leagueID, ownerID);
+    return updated[0];
   }
 
   async getAllLeagues() {

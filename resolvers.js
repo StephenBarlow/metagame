@@ -100,6 +100,41 @@ const resolvers = {
     }
   },
   Mutation: {
+    async setFavoriteTeam(parent, { request }, { dataSources }) {
+      const userID = Number(request.userID);
+      const leagueID = Number(request.leagueID);
+      const teamID = Number(request.teamID);
+      if (![userID, leagueID, teamID].every(Number.isInteger) ||
+          userID < 1 || leagueID < 1 || teamID < 1) {
+        return favoriteTeamError('User, league, and team IDs must be positive integers.');
+      }
+
+      try {
+        const [league, team, membership] = await Promise.all([
+          dataSources.pg.getLeagueById(leagueID),
+          dataSources.pg.getTeamById(teamID),
+          dataSources.pg.getMembership(userID, leagueID)
+        ]);
+        if (!league) return favoriteTeamError('Fantasy league not found.');
+        if (!membership) return favoriteTeamError('User is not an active member of this league.');
+        if (membership.favorite_team_id !== null && membership.favorite_team_id !== undefined) {
+          return favoriteTeamError('A favorite team has already been selected for this league.');
+        }
+        if (!team || team.sports_league !== league.sports_league) {
+          return favoriteTeamError('Favorite team must belong to this league\'s sports league.');
+        }
+
+        const updated = await dataSources.pg.setMembershipFavoriteTeam(userID, leagueID, teamID, league.owner_id);
+        if (!updated) return favoriteTeamError('A favorite team has already been selected for this league.');
+        return { favoriteTeam: teamFromRow(team), errors: [] };
+      } catch (err) {
+        console.log(err.stack);
+        return {
+          favoriteTeam: null,
+          errors: [{ code: GQL_UNKNOWN_ERROR, message: 'Failed to save favorite team. Please retry.' }]
+        };
+      }
+    },
     async submitPick(parent, { request }, context, info) {
       const dataSources = context.dataSources;
       const validPick = await validatePick(request, dataSources.pg, context);
@@ -272,8 +307,28 @@ const resolvers = {
         console.log(err.stack);
       }
     },
+
+    async favoriteTeam(user, { leagueID }, { dataSources }) {
+      try {
+        const favoriteTeamID = String(user.membershipLeagueID) === String(leagueID)
+          ? user.favoriteTeamID
+          : (await dataSources.pg.getMembership(user.id, leagueID))?.favorite_team_id;
+        if (favoriteTeamID === null || favoriteTeamID === undefined) return null;
+        const team = await dataSources.pg.getTeamById(favoriteTeamID);
+        return team ? teamFromRow(team) : null;
+      } catch (err) {
+        console.log(err.stack);
+      }
+    },
   }
 };
+
+function favoriteTeamError(message) {
+  return {
+    favoriteTeam: null,
+    errors: [{ code: GQL_INVALID_INPUT, message }]
+  };
+}
 
 async function registerPick(pickRequest, pg) {
   const { leagueID } = pickRequest;
@@ -467,6 +522,10 @@ function userFromRow(row) {
     id: row.user_id,
     email: row.email,
     displayName: row.display_name,
+
+    // Not schema fields, but used by the league-scoped favoriteTeam resolver.
+    favoriteTeamID: row.favorite_team_id,
+    membershipLeagueID: row.league_id
   }
 }
 
