@@ -26,8 +26,9 @@ const resolvers = {
         context.dataSources.pg.getTeams()
       ]);
       let picks;
+      const revealedWeek = effectiveLeagueWeek(league, 'revealed_week', 'REVEALED_WEEK', 0);
       if (league.season === process.env.CURRENT_SEASON) {
-        picks = await context.dataSources.pg.getPicksForLeague(leagueID);
+        picks = await context.dataSources.pg.getPicksForLeague(leagueID, false, revealedWeek);
       } else {
         picks = await context.dataSources.pg.getPicksForLeague(leagueID, true);
       }
@@ -74,7 +75,9 @@ const resolvers = {
     },
     async currentPick(parent, {leagueID, userID}, { dataSources }, info) {
       try {
-        const result = await dataSources.pg.getCurrentPick(leagueID, userID, parseInt(process.env.CURRENT_WEEK));
+        const league = await dataSources.pg.getLeagueById(leagueID);
+        const currentWeek = effectiveLeagueWeek(league, 'current_week', 'CURRENT_WEEK', 1);
+        const result = await dataSources.pg.getCurrentPick(leagueID, userID, currentWeek);
         return result.map(function(row) {
           return pickFromRow(row);
         });
@@ -475,12 +478,19 @@ function leagueFromRow(row) {
     name: row.name,
     gameMode: row.game_mode,
     season: row.season,
-    currentWeek: parseInt(process.env.CURRENT_WEEK) || 1,
-    revealedWeek: parseInt(process.env.REVEALED_WEEK) || 0,
+    currentWeek: effectiveLeagueWeek(row, 'current_week', 'CURRENT_WEEK', 1),
+    revealedWeek: effectiveLeagueWeek(row, 'revealed_week', 'REVEALED_WEEK', 0),
 
     // Not schema fields, but used by subresolvers
     ownerID: row.owner_id
   };
+}
+
+function effectiveLeagueWeek(league, column, environmentVariable, fallback) {
+  const leagueWeek = Number(league?.[column]);
+  if (Number.isInteger(leagueWeek)) return leagueWeek;
+  const environmentWeek = Number(process.env[environmentVariable]);
+  return Number.isInteger(environmentWeek) ? environmentWeek : fallback;
 }
 
 function teamFromRow(row) {

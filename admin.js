@@ -139,6 +139,11 @@ function nullableScore(value, label) {
   return requiredInteger(value, label, 0, 999);
 }
 
+function nullableWeek(value, label, minimum = 0) {
+  if (value === '' || value === undefined || value === null) return null;
+  return requiredInteger(value, label, minimum, 25);
+}
+
 function validSeason(value) {
   const season = String(value ?? '').trim();
   if (!/^\d{4}$/.test(season)) throw new AdminInputError('Season must be a four-digit year.');
@@ -501,9 +506,31 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
           <label>Display name<input name="display_name" required maxlength="255"></label><button type="submit" ${availableUsers.length ? '' : 'disabled'}>Add member</button>
         </form>`;
     const content = `<p><strong>${escapeHtml(league.name)}</strong> · ${escapeHtml(league.season)} · ${isConcluded(league) ? 'Concluded' : 'Active'}</p>
+      <div class="panel"><h2>League week settings</h2><p class="muted">Leave either value blank to use the corresponding environment variable.</p>
+        <form class="form-grid" method="post" action="/admin/leagues/${leagueID}/settings">
+          <label>Current week<input name="current_week" type="number" min="1" max="25" value="${escapeHtml(league.current_week ?? '')}"></label>
+          <label>Revealed week<input name="revealed_week" type="number" min="0" max="25" value="${escapeHtml(league.revealed_week ?? '')}"></label>
+          <button type="submit">Save week settings</button>
+        </form>
+      </div>
       <div class="panel"><h2>Add an existing user</h2>${addForm}</div>
       <div class="table-wrap"><table><thead><tr><th>Display name</th><th>Email</th><th>Joined</th></tr></thead><tbody>${rows || '<tr><td colspan="3">No members.</td></tr>'}</tbody></table></div>`;
     res.send(page('League members', content, req.query.notice, req.query.notice_type));
+  });
+
+  router.post('/leagues/:id/settings', async (req, res) => {
+    const leagueID = requiredInteger(req.params.id, 'League ID');
+    const currentWeek = nullableWeek(req.body.current_week, 'Current week', 1);
+    const revealedWeek = nullableWeek(req.body.revealed_week, 'Revealed week', 0);
+    const league = await db('fantasy_leagues').where({ id: leagueID }).first();
+    if (!league) throw new AdminInputError('League not found.');
+    await db('fantasy_leagues').where({ id: leagueID }).update({
+      current_week: currentWeek,
+      revealed_week: revealedWeek
+    });
+    await pg.invalidateLeagueCache(leagueID);
+    await pg.invalidateLeaguePicksCache(leagueID);
+    redirectWithNotice(res, `/admin/leagues/${leagueID}`, 'League week settings updated.');
   });
 
   router.post('/leagues/:id/members', async (req, res) => {

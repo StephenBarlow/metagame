@@ -43,7 +43,7 @@ class PGDB {
     return rows;
   }
 
-  picksForLeagueQuery(leagueID, leagueConcluded = false) {
+  picksForLeagueQuery(leagueID, leagueConcluded = false, revealedWeek = parseInt(process.env.REVEALED_WEEK)) {
     return this.knex
       .select('*')
       .from('picks')
@@ -51,7 +51,7 @@ class PGDB {
         'league_id': leagueID,
         'invalidated_at': null
       })
-      .whereRaw('week <= ?', (leagueConcluded ? [MAX_WEEK] : [parseInt(process.env.REVEALED_WEEK)] ));
+      .whereRaw('week <= ?', (leagueConcluded ? [MAX_WEEK] : [revealedWeek]));
   }
 
   currentPickQuery(leagueID, userID, week) {
@@ -177,8 +177,12 @@ class PGDB {
     }
 
     const queries = [];
+    const leagueSettings = await this.knex('fantasy_leagues')
+      .select(['id', 'revealed_week'])
+      .whereIn('id', [...leagueIDs]);
+    const revealedWeeks = new Map(leagueSettings.map(league => [league.id, league.revealed_week]));
     for (const leagueID of leagueIDs) {
-      queries.push(this.picksForLeagueQuery(leagueID));
+      queries.push(this.picksForLeagueQuery(leagueID, false, revealedWeeks.get(leagueID) ?? parseInt(process.env.REVEALED_WEEK)));
       queries.push(this.picksForLeagueQuery(leagueID, true));
     }
     for (const { user_id: userID, league_id: leagueID } of members.values()) {
@@ -217,6 +221,17 @@ class PGDB {
     await this.invalidateQueries([
       this.allLeaguesQuery(),
       this.leagueByIdQuery(leagueID)
+    ]);
+  }
+
+  async invalidateLeaguePicksCache(leagueID) {
+    const league = await this.knex('fantasy_leagues')
+      .select(['revealed_week'])
+      .where({ id: leagueID })
+      .first();
+    await this.invalidateQueries([
+      this.picksForLeagueQuery(leagueID, false, league?.revealed_week ?? parseInt(process.env.REVEALED_WEEK)),
+      this.picksForLeagueQuery(leagueID, true)
     ]);
   }
 
@@ -371,9 +386,9 @@ class PGDB {
     return val;
   }
 
-  async getPicksForLeague(leagueID, leagueConcluded = false) {
+  async getPicksForLeague(leagueID, leagueConcluded = false, revealedWeek) {
     const val = await this.cacheQuery(
-      this.picksForLeagueQuery(leagueID, leagueConcluded),
+      this.picksForLeagueQuery(leagueID, leagueConcluded, revealedWeek),
       MINUTE
     );
     return val;
