@@ -157,6 +157,47 @@ test('result streaks neither count nor break on a bye week', () => {
   assert.deepEqual(matches[0].evidence.qualifying_weeks, [1, 3]);
 });
 
+test('favorite-team result achievements require the favorite team and the configured outcome', () => {
+  const context = contextFixture({
+    members: [
+      { user_id: 10, display_name: 'Favorite set', favorite_team_id: 1 },
+      { user_id: 11, display_name: 'Favorite unset', favorite_team_id: null }
+    ],
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' },
+      { id: 3, short_name: 'C', sports_league: 'NFL' },
+      { id: 4, short_name: 'D', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'C', away_team_score: 21, home_team_score: 14 },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'D', away_team_score: 17, home_team_score: 10 }
+    ],
+    picks: [
+      { id: 1, user_id: 10, team_id: 1, week: 1, invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 2, week: 1, invalidated_at: null },
+      { id: 3, user_id: 11, team_id: 3, week: 1, invalidated_at: null },
+      { id: 4, user_id: 11, team_id: 4, week: 1, invalidated_at: null }
+    ]
+  });
+
+  const bestWeekEver = evaluateAchievement({
+    key: 'BEST_WEEK_EVER',
+    evaluator: 'favoriteTeamResult',
+    condition_config: { result: 'double_win' }
+  }, context);
+  const silverLining = evaluateAchievement({
+    key: 'SILVER_LINING',
+    evaluator: 'favoriteTeamResult',
+    condition_config: { result: 'double_loss' }
+  }, context);
+
+  assert.equal(bestWeekEver.length, 1);
+  assert.equal(bestWeekEver[0].userId, 10);
+  assert.equal(bestWeekEver[0].evidence.favorite_team_id, 1);
+  assert.equal(silverLining.length, 0);
+});
+
 test('maximum possible score considers all teams, not only player availability', () => {
   const context = contextFixture({
     games: [

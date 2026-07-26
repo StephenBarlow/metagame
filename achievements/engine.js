@@ -40,7 +40,7 @@ async function enabledAchievements(db, leagueId) {
 async function loadEvaluationData(db, league, week) {
   const [members, picks, teams, teamTags, games, gameTags] = await Promise.all([
     db('memberships')
-      .select(['user_id', 'display_name'])
+      .select(['user_id', 'display_name', 'favorite_team_id'])
       .where({ league_id: league.id, revoked_at: null }),
     db('picks').select('*').where({ league_id: league.id }),
     db('teams').select('*').where({ sports_league: league.sports_league }),

@@ -41,6 +41,8 @@ achievement once in each league, but never more than once in the same league.
 | Barely Would've Mattered | Split with your teams winning or losing by a combined margin of 5 or less. (Repeatable) |
 | Road Warriors | Achieve a double win with two away teams. (Repeatable) |
 | Homewrecked | Achieve a double loss with two home teams. (Repeatable) |
+| Silver Lining | Achieve a double-loss with your favorite team. |
+| Best Week Ever | Achieve a double-win with your favorite team. |
 | Absolute Drubbing | Score with one of your picked games ending in a shutout. (Repeatable) |
 | World Traveler | Twice this season, pick a team from a game that's played outside the United States. |
 | Mirror Image | Pick two teams whose games finish with the exact same final score. (Repeatable) |

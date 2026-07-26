@@ -390,6 +390,33 @@ function evaluateVenueAndResult(achievement, context) {
   );
 }
 
+function evaluateFavoriteTeamResult(achievement, context) {
+  const config = achievement.condition_config;
+  return playerWeekCandidates(
+    context,
+    userId => {
+      const member = context.members.find(row => String(row.user_id) === String(userId));
+      if (member?.favorite_team_id === null || member?.favorite_team_id === undefined) return false;
+
+      const result = context.getWeekResult(userId, context.week);
+      const weekPick = context.getWeekPick(userId, context.week);
+      return result.complete && !result.isBye &&
+        result.outcome === config.result &&
+        weekPick.picks.some(pick => String(pick.team_id) === String(member.favorite_team_id));
+    },
+    userId => {
+      const member = context.members.find(row => String(row.user_id) === String(userId));
+      const result = context.getWeekResult(userId, context.week);
+      return pickEvidence(context.getWeekPick(userId, context.week), {
+        favorite_team_id: member.favorite_team_id,
+        outcome: result.outcome,
+        score: result.score,
+        margins: result.margins
+      });
+    }
+  );
+}
+
 function evaluateMatchingFinalScores(achievement, context) {
   return completedResultCandidates(achievement, context, (result, weekPick) => {
     if (weekPick.games[0].id === weekPick.games[1].id) return false;
@@ -513,6 +540,7 @@ const evaluatorRegistry = {
   scorePattern: evaluateScorePattern,
   weeklyScore: evaluateWeeklyScore,
   venueAndResult: evaluateVenueAndResult,
+  favoriteTeamResult: evaluateFavoriteTeamResult,
   matchingFinalScores: evaluateMatchingFinalScores,
   overallStanding: evaluateOverallStanding,
   matchingWeeklyScore: evaluateMatchingWeeklyScore,

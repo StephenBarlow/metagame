@@ -658,5 +658,29 @@
     "condition_config": { "qualifying_results": ["split"], "consecutive_weeks": 8, "ignore_bye_weeks": true },
     "repeatable": false,
     "active": true
+  },
+  {
+    "key": "SILVER_LINING",
+    "name": "Silver Lining",
+    "description": "Achieve a double-loss with your favorite team.",
+    "icon_id": null,
+    "evaluator": "favoriteTeamResult",
+    "evaluation_phase": "week_finalized",
+    "scope": "player_week",
+    "condition_config": { "result": "double_loss" },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "BEST_WEEK_EVER",
+    "name": "Best Week Ever",
+    "description": "Achieve a double-win with your favorite team.",
+    "icon_id": null,
+    "evaluator": "favoriteTeamResult",
+    "evaluation_phase": "week_finalized",
+    "scope": "player_week",
+    "condition_config": { "result": "double_win" },
+    "repeatable": false,
+    "active": true
   }
 ]
