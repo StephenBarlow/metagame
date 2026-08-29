@@ -282,6 +282,105 @@ function evaluateUnchangedEarlyPick(achievement, context) {
   );
 }
 
+function evaluateLatePickSubmission(achievement, context) {
+  const maximumMilliseconds = achievement.condition_config.minutes_before_game_at_most * 60 * 1000;
+  return playerWeekCandidates(
+    context,
+    userId => qualifyingBuzzerBeaterPicks(userId, context, maximumMilliseconds).length > 0,
+    userId => {
+      const qualifyingPicks = qualifyingBuzzerBeaterPicks(userId, context, maximumMilliseconds);
+      return pickEvidence(context.getWeekPick(userId, context.week), {
+        qualifying_picks: qualifyingPicks,
+        minutes_before_game_at_most: achievement.condition_config.minutes_before_game_at_most
+      });
+    }
+  );
+}
+
+function evaluateLimitedGameAvailability(achievement, context) {
+  const maximumRemainingGames = achievement.condition_config.remaining_game_count_below;
+  return playerWeekCandidates(
+    context,
+    userId => {
+      const { eligible, games } = remainingGamesAtSubmission(userId, context);
+      return eligible && games.length < maximumRemainingGames;
+    },
+    userId => {
+      const { submittedAt, games } = remainingGamesAtSubmission(userId, context);
+      return pickEvidence(context.getWeekPick(userId, context.week), {
+        submitted_at: submittedAt?.toISOString(),
+        remaining_game_ids: games.map(game => game.id),
+        remaining_game_count: games.length,
+        remaining_game_count_below: maximumRemainingGames
+      });
+    }
+  );
+}
+
+function evaluateMatchingPickGroup(achievement, context) {
+  const minimumOthers = achievement.condition_config.other_player_count_at_least;
+  const groups = new Map();
+  for (const member of context.members) {
+    const weekPick = context.getWeekPick(member.user_id, context.week);
+    if (weekPick.picks.length !== 2 || weekPick.isBye) continue;
+    const teamIds = weekPick.picks.map(pick => String(pick.team_id)).sort();
+    const groupKey = teamIds.join(':');
+    const group = groups.get(groupKey) || { teamIds, userIds: [] };
+    group.userIds.push(member.user_id);
+    groups.set(groupKey, group);
+  }
+
+  return [...groups.values()]
+    .filter(group => group.userIds.length >= minimumOthers + 1)
+    .flatMap(group => group.userIds.map(userId => ({
+      userId,
+      evidence: pickEvidence(context.getWeekPick(userId, context.week), {
+        matching_user_ids: group.userIds.filter(otherUserId => String(otherUserId) !== String(userId)),
+        matching_player_count: group.userIds.length,
+        other_player_count_at_least: minimumOthers
+      })
+    })));
+}
+
+function remainingGamesAtSubmission(userId, context) {
+  const weekPick = context.getWeekPick(userId, context.week);
+  if (weekPick.picks.length !== 2 || weekPick.isBye) return { eligible: false, submittedAt: null, games: [] };
+
+  const submittedAt = new Date(Math.max(...weekPick.picks.map(pick => new Date(pick.created_at).getTime())));
+  if (Number.isNaN(submittedAt.getTime())) return { eligible: false, submittedAt: null, games: [] };
+  return {
+    eligible: true,
+    submittedAt,
+    games: (context.gamesByWeek.get(context.week) || []).filter(game =>
+      new Date(game.start_time).getTime() > submittedAt.getTime()
+    )
+  };
+}
+
+function qualifyingBuzzerBeaterPicks(userId, context, maximumMilliseconds) {
+  const weekPick = context.getWeekPick(userId, context.week);
+  if (weekPick.picks.length !== 2 || weekPick.isBye) return [];
+
+  return weekPick.picks.flatMap((pick, index) => {
+    const game = weekPick.games[index];
+    const submittedAt = new Date(pick.created_at).getTime();
+    const gameStartsAt = new Date(game?.start_time).getTime();
+    const millisecondsBeforeGame = gameStartsAt - submittedAt;
+    if (!Number.isFinite(millisecondsBeforeGame) ||
+        millisecondsBeforeGame < 0 || millisecondsBeforeGame > maximumMilliseconds) {
+      return [];
+    }
+    return [{
+      pick_id: pick.id,
+      team_id: pick.team_id,
+      game_id: game.id,
+      submitted_at: pick.created_at,
+      game_starts_at: game.start_time,
+      milliseconds_before_game: millisecondsBeforeGame
+    }];
+  });
+}
+
 function evaluateOpponentPickCount(achievement, context) {
   const threshold = achievement.condition_config.opponent_pick_count_at_least;
   return playerWeekCandidates(
@@ -400,15 +499,24 @@ function evaluateFavoriteTeamResult(achievement, context) {
 
       const result = context.getWeekResult(userId, context.week);
       const weekPick = context.getWeekPick(userId, context.week);
-      return result.complete && !result.isBye &&
-        result.outcome === config.result &&
-        weekPick.picks.some(pick => String(pick.team_id) === String(member.favorite_team_id));
+      const favoritePickIndex = weekPick.picks.findIndex(pick =>
+        String(pick.team_id) === String(member.favorite_team_id)
+      );
+      if (!result.complete || result.isBye || result.outcome !== config.result || favoritePickIndex < 0) return false;
+      if (config.favorite_team_result === 'loss') return result.margins[favoritePickIndex] < 0;
+      if (config.favorite_team_result === 'win') return result.margins[favoritePickIndex] > 0;
+      return true;
     },
     userId => {
       const member = context.members.find(row => String(row.user_id) === String(userId));
       const result = context.getWeekResult(userId, context.week);
+      const weekPick = context.getWeekPick(userId, context.week);
+      const favoritePickIndex = weekPick.picks.findIndex(pick =>
+        String(pick.team_id) === String(member.favorite_team_id)
+      );
       return pickEvidence(context.getWeekPick(userId, context.week), {
         favorite_team_id: member.favorite_team_id,
+        favorite_team_margin: result.margins[favoritePickIndex],
         outcome: result.outcome,
         score: result.score,
         margins: result.margins
@@ -534,6 +642,9 @@ const evaluatorRegistry = {
   uniquePickedGames: evaluateUniquePickedGames,
   pickSubmissionHistory: evaluatePickSubmissionHistory,
   unchangedEarlyPick: evaluateUnchangedEarlyPick,
+  latePickSubmission: evaluateLatePickSubmission,
+  limitedGameAvailability: evaluateLimitedGameAvailability,
+  matchingPickGroup: evaluateMatchingPickGroup,
   opponentPickCount: evaluateOpponentPickCount,
   scoreMargins: evaluateScoreMargins,
   pickedGameResult: evaluatePickedGameResult,

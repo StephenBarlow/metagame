@@ -11,7 +11,7 @@ achievement once in each league, but never more than once in the same league.
 | For the Birds | Pick two teams with bird mascots in the same week. |
 | 7-10 Split | Split with two teams whose games finish with margins of seven and ten points. (Repeatable) |
 | Yarrr | Pick the Bucs and Raiders in the same week. |
-| Empire State of Mind | Pick the Giants and Jets in the same week. |
+| Empire State of Mind | Pick any two of the Bills, Giants, and Jets in the same week. |
 | There Go That Horse | Pick the Broncos and Colts in the same week. |
 | Ohio Bowl | Pick the Browns and Bengals in the same week. |
 | What is this, Soccer?! | Pick a tie. (Repeatable) |
@@ -43,11 +43,16 @@ achievement once in each league, but never more than once in the same league.
 | Homewrecked | Achieve a double loss with two home teams. (Repeatable) |
 | Silver Lining | Achieve a double-loss with your favorite team. |
 | Best Week Ever | Achieve a double-win with your favorite team. |
+| Worst of All Worlds | Split when picking your favorite team because they lost. |
+| Bittersweet Split | Split when picking your favorite team because they won. |
 | Absolute Drubbing | Score with one of your picked games ending in a shutout. (Repeatable) |
 | World Traveler | Twice this season, pick a team from a game that's played outside the United States. |
 | Mirror Image | Pick two teams whose games finish with the exact same final score. (Repeatable) |
 | Indecisive | Submit at least three unique non-BYE picks for a single week. |
 | The Long Game | Submit a pick at least four weeks in advance and don't replace it. |
+| Buzzer Beater | Submit a pick within 5 minutes of one of your teams starting their game. |
+| Slim Pickings | Submit a pick when fewer than five games remain available to pick from. |
+| Sheep | Submit the exact same non-BYE picks as at least five other players. |
 | Opposition Research | Pick the opponent of any single team at least five times. |
 | Brady Bunch | Pick the Patriots and Bucs in the same week. |
 | Six Sevennn! | Pick a double-win with one team winning by six and the other by seven. (Repeatable) |
@@ -55,6 +60,7 @@ achievement once in each league, but never more than once in the same league.
 | Bird Brain | For the second time in a season, pick two teams with bird mascots. |
 | Toxoplasmosis | For the second time in a season, pick two teams with cat mascots. |
 | Country and Western | Pick the Titans and Cowboys in the same week. |
+| California Love | Pick any two of the 49ers, Rams, and Chargers in a single week. |
 | Local Maximum | Score the highest possible number of points in a given week. |
 | Fee-fi-fo-fum | Pick the Giants and Titans in the same week. |
 | Family Manning | In a single week, pick any two of the Colts, Giants, and Saints. |

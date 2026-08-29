@@ -50,12 +50,12 @@
   {
     "key": "EMPIRE_STATE_OF_MIND",
     "name": "Empire State of Mind",
-    "description": "Pick the Giants and Jets in the same week.",
+    "description": "Pick any two of the Bills, Giants, and Jets in the same week.",
     "icon_id": null,
     "evaluator": "teamCombination",
     "evaluation_phase": "pick_locked",
     "scope": "player_week",
-    "condition_config": { "requirements": [{ "match": { "short_name": "NYG" }, "count": 1 }, { "match": { "short_name": "NYJ" }, "count": 1 }] },
+    "condition_config": { "requirements": [{ "any_match": [{ "short_name": "BUF" }, { "short_name": "NYG" }, { "short_name": "NYJ" }], "count": 2 }] },
     "repeatable": false,
     "active": true
   },
@@ -552,6 +552,18 @@
     "active": true
   },
   {
+    "key": "CALIFORNIA_LOVE",
+    "name": "California Love",
+    "description": "Pick any two of the 49ers, Rams, and Chargers in a single week.",
+    "icon_id": null,
+    "evaluator": "teamCombination",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_week",
+    "condition_config": { "requirements": [{ "any_match": [{ "short_name": "SF" }, { "short_name": "LAR" }, { "short_name": "LAC" }], "count": 2 }] },
+    "repeatable": false,
+    "active": true
+  },
+  {
     "key": "LOCAL_MAXIMUM",
     "name": "Local Maximum",
     "description": "Score the highest possible number of points in a given week.",
@@ -660,6 +672,42 @@
     "active": true
   },
   {
+    "key": "BUZZER_BEATER",
+    "name": "Buzzer Beater",
+    "description": "Submit a pick within 5 minutes of one of your teams starting their game.",
+    "icon_id": null,
+    "evaluator": "latePickSubmission",
+    "evaluation_phase": "pick_locked",
+    "scope": "player_week",
+    "condition_config": { "minutes_before_game_at_most": 5 },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "SLIM_PICKINGS",
+    "name": "Slim Pickings",
+    "description": "Submit a pick when fewer than five games remain available to pick from.",
+    "icon_id": null,
+    "evaluator": "limitedGameAvailability",
+    "evaluation_phase": "week_finalized",
+    "scope": "player_week",
+    "condition_config": { "remaining_game_count_below": 5 },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "SHEEP",
+    "name": "Sheep",
+    "description": "Submit the exact same non-BYE picks as at least five other players.",
+    "icon_id": null,
+    "evaluator": "matchingPickGroup",
+    "evaluation_phase": "pick_locked",
+    "scope": "league_week",
+    "condition_config": { "other_player_count_at_least": 5 },
+    "repeatable": false,
+    "active": true
+  },
+  {
     "key": "SILVER_LINING",
     "name": "Silver Lining",
     "description": "Achieve a double-loss with your favorite team.",
@@ -680,6 +728,30 @@
     "evaluation_phase": "week_finalized",
     "scope": "player_week",
     "condition_config": { "result": "double_win" },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "WORST_OF_ALL_WORLDS",
+    "name": "Worst of All Worlds",
+    "description": "Split when picking your favorite team because they lost.",
+    "icon_id": null,
+    "evaluator": "favoriteTeamResult",
+    "evaluation_phase": "week_finalized",
+    "scope": "player_week",
+    "condition_config": { "result": "split", "favorite_team_result": "loss" },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "BITTERSWEET_SPLIT",
+    "name": "Bittersweet Split",
+    "description": "Split when picking your favorite team because they won.",
+    "icon_id": null,
+    "evaluator": "favoriteTeamResult",
+    "evaluation_phase": "week_finalized",
+    "scope": "player_week",
+    "condition_config": { "result": "split", "favorite_team_result": "win" },
     "repeatable": false,
     "active": true
   }

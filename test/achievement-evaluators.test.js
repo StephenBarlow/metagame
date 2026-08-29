@@ -79,6 +79,54 @@ test('teamCombination supports choosing any two distinct teams from an option se
   assert.equal(matches.length, 1);
 });
 
+test('California Love accepts any distinct pair of 49ers, Rams, and Chargers', () => {
+  const context = contextFixture({
+    picks: [
+      { id: 1, user_id: 10, team_id: 1, week: 1, invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 2, week: 1, invalidated_at: null }
+    ],
+    teams: [
+      { id: 1, short_name: 'LAR', sports_league: 'NFL' },
+      { id: 2, short_name: 'LAC', sports_league: 'NFL' }
+    ]
+  });
+  const matches = evaluateAchievement({
+    key: 'CALIFORNIA_LOVE',
+    evaluator: 'teamCombination',
+    condition_config: {
+      requirements: [{
+        any_match: [{ short_name: 'SF' }, { short_name: 'LAR' }, { short_name: 'LAC' }],
+        count: 2
+      }]
+    }
+  }, context);
+  assert.equal(matches.length, 1);
+});
+
+test('Empire State of Mind accepts a Bills pairing with either New York team', () => {
+  const context = contextFixture({
+    picks: [
+      { id: 1, user_id: 10, team_id: 1, week: 1, invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 2, week: 1, invalidated_at: null }
+    ],
+    teams: [
+      { id: 1, short_name: 'BUF', sports_league: 'NFL' },
+      { id: 2, short_name: 'NYJ', sports_league: 'NFL' }
+    ]
+  });
+  const matches = evaluateAchievement({
+    key: 'EMPIRE_STATE_OF_MIND',
+    evaluator: 'teamCombination',
+    condition_config: {
+      requirements: [{
+        any_match: [{ short_name: 'BUF' }, { short_name: 'NYG' }, { short_name: 'NYJ' }],
+        count: 2
+      }]
+    }
+  }, context);
+  assert.equal(matches.length, 1);
+});
+
 test('a picked-team seasonal threshold counts two tagged picks, including in different weeks', () => {
   const teams = [
     { id: 1, short_name: 'A', sports_league: 'NFL' },
@@ -196,6 +244,169 @@ test('favorite-team result achievements require the favorite team and the config
   assert.equal(bestWeekEver[0].userId, 10);
   assert.equal(bestWeekEver[0].evidence.favorite_team_id, 1);
   assert.equal(silverLining.length, 0);
+});
+
+test('Worst of All Worlds requires the favorite team to be the losing side of a split', () => {
+  const context = contextFixture({
+    members: [{ user_id: 10, display_name: 'Favorite set', favorite_team_id: 1 }],
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'C', away_team_score: 14, home_team_score: 21 },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'D', away_team_score: 24, home_team_score: 17 }
+    ],
+    picks: [
+      { id: 1, user_id: 10, team_id: 1, week: 1, invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 2, week: 1, invalidated_at: null }
+    ]
+  });
+  const matches = evaluateAchievement({
+    key: 'WORST_OF_ALL_WORLDS',
+    evaluator: 'favoriteTeamResult',
+    condition_config: { result: 'split', favorite_team_result: 'loss' }
+  }, context);
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].evidence.favorite_team_margin, -7);
+});
+
+test('Bittersweet Split requires the favorite team to be the winning side of a split', () => {
+  const context = contextFixture({
+    members: [{ user_id: 10, display_name: 'Favorite set', favorite_team_id: 1 }],
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'C', away_team_score: 21, home_team_score: 14 },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'D', away_team_score: 17, home_team_score: 24 }
+    ],
+    picks: [
+      { id: 1, user_id: 10, team_id: 1, week: 1, invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 2, week: 1, invalidated_at: null }
+    ]
+  });
+  const matches = evaluateAchievement({
+    key: 'BITTERSWEET_SPLIT',
+    evaluator: 'favoriteTeamResult',
+    condition_config: { result: 'split', favorite_team_result: 'win' }
+  }, context);
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].evidence.favorite_team_margin, 7);
+});
+
+test('Buzzer Beater uses only the active pick and requires submission within five minutes before a picked game', () => {
+  const context = contextFixture({
+    members: [
+      { user_id: 10, display_name: 'Buzzer beater' },
+      { user_id: 11, display_name: 'Changed pick' }
+    ],
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' },
+      { id: 3, short_name: 'C', sports_league: 'NFL' },
+      { id: 4, short_name: 'D', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'C', start_time: '2026-09-10T20:00:00.000Z' },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'D', start_time: '2026-09-10T22:00:00.000Z' }
+    ],
+    picks: [
+      { id: 1, user_id: 10, team_id: 1, week: 1, created_at: '2026-09-10T19:56:00.000Z', invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 2, week: 1, created_at: '2026-09-10T19:56:00.000Z', invalidated_at: null },
+      { id: 3, user_id: 11, team_id: 1, week: 1, created_at: '2026-09-10T19:56:00.000Z', invalidated_at: '2026-09-10T19:57:00.000Z' },
+      { id: 4, user_id: 11, team_id: 2, week: 1, created_at: '2026-09-10T19:56:00.000Z', invalidated_at: '2026-09-10T19:57:00.000Z' },
+      { id: 5, user_id: 11, team_id: 1, week: 1, created_at: '2026-09-10T19:00:00.000Z', invalidated_at: null },
+      { id: 6, user_id: 11, team_id: 2, week: 1, created_at: '2026-09-10T19:00:00.000Z', invalidated_at: null }
+    ]
+  });
+
+  const matches = evaluateAchievement({
+    key: 'BUZZER_BEATER',
+    evaluator: 'latePickSubmission',
+    condition_config: { minutes_before_game_at_most: 5 }
+  }, context);
+
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].userId, 10);
+  assert.deepEqual(matches[0].evidence.qualifying_picks.map(pick => pick.pick_id), [1]);
+});
+
+test('Slim Pickings counts games still unstarted when the final active pick was submitted', () => {
+  const games = [
+    { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'C', start_time: '2026-09-10T16:00:00.000Z' },
+    { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'D', start_time: '2026-09-10T17:00:00.000Z' },
+    { id: 3, week: 1, away_team_short_name: 'E', home_team_short_name: 'F', start_time: '2026-09-10T18:00:00.000Z' },
+    { id: 4, week: 1, away_team_short_name: 'G', home_team_short_name: 'H', start_time: '2026-09-10T19:00:00.000Z' },
+    { id: 5, week: 1, away_team_short_name: 'I', home_team_short_name: 'J', start_time: '2026-09-10T20:00:00.000Z' },
+    { id: 6, week: 1, away_team_short_name: 'K', home_team_short_name: 'L', start_time: '2026-09-10T21:00:00.000Z' }
+  ];
+  const context = contextFixture({
+    members: [
+      { user_id: 10, display_name: 'Late picker' },
+      { user_id: 11, display_name: 'Replaced late pick' }
+    ],
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' }
+    ],
+    games,
+    picks: [
+      { id: 1, user_id: 10, team_id: 1, week: 1, created_at: '2026-09-10T17:30:00.000Z', invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 2, week: 1, created_at: '2026-09-10T17:30:00.000Z', invalidated_at: null },
+      { id: 3, user_id: 11, team_id: 1, week: 1, created_at: '2026-09-10T17:30:00.000Z', invalidated_at: '2026-09-10T17:31:00.000Z' },
+      { id: 4, user_id: 11, team_id: 2, week: 1, created_at: '2026-09-10T17:30:00.000Z', invalidated_at: '2026-09-10T17:31:00.000Z' },
+      { id: 5, user_id: 11, team_id: 1, week: 1, created_at: '2026-09-10T15:30:00.000Z', invalidated_at: null },
+      { id: 6, user_id: 11, team_id: 2, week: 1, created_at: '2026-09-10T15:30:00.000Z', invalidated_at: null }
+    ]
+  });
+
+  const matches = evaluateAchievement({
+    key: 'SLIM_PICKINGS',
+    evaluator: 'limitedGameAvailability',
+    condition_config: { remaining_game_count_below: 5 }
+  }, context);
+
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].userId, 10);
+  assert.equal(matches[0].evidence.remaining_game_count, 4);
+  assert.deepEqual(matches[0].evidence.remaining_game_ids, [3, 4, 5, 6]);
+});
+
+test('Sheep awards each player sharing the same active non-BYE pair with five others', () => {
+  const members = Array.from({ length: 7 }, (_, index) => ({
+    user_id: index + 1,
+    display_name: `Player ${index + 1}`
+  }));
+  const picks = members.flatMap((member, index) => {
+    const teamIds = index < 6 ? [1, 2] : [-1, -1];
+    return teamIds.map((team_id, pickIndex) => ({
+      id: member.user_id * 10 + pickIndex,
+      user_id: member.user_id,
+      team_id,
+      week: 1,
+      invalidated_at: null
+    }));
+  });
+  const context = contextFixture({
+    members,
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' }
+    ],
+    picks
+  });
+
+  const matches = evaluateAchievement({
+    key: 'SHEEP',
+    evaluator: 'matchingPickGroup',
+    condition_config: { other_player_count_at_least: 5 }
+  }, context);
+
+  assert.deepEqual(matches.map(match => match.userId), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(matches[0].evidence.matching_user_ids, [2, 3, 4, 5, 6]);
+  assert.equal(matches[0].evidence.matching_player_count, 6);
 });
 
 test('maximum possible score considers all teams, not only player availability', () => {
