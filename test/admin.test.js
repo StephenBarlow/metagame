@@ -3,7 +3,14 @@ const http = require('node:http');
 const test = require('node:test');
 const express = require('express');
 
-const { createAdminRouter, parseBasicAuthorization, parseScheduleCsv, validMessageTemplateFormat } = require('../admin');
+const {
+  createAdminRouter,
+  parseBasicAuthorization,
+  parseScheduleCsv,
+  validMessageTemplateFormat,
+  validMessageValueKind,
+  validMessageValueText
+} = require('../admin');
 
 function authorization(username, password) {
   return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
@@ -88,6 +95,14 @@ test('message template text preserves every configured dynamic placeholder', () 
     () => validMessageTemplateFormat('Hello {subject', slots),
     /must use the form/
   );
+});
+
+test('message value inputs accept only the two supported lists and non-empty text', () => {
+  assert.equal(validMessageValueKind('catalog_value'), 'catalog_value');
+  assert.equal(validMessageValueKind('adjective'), 'adjective');
+  assert.throws(() => validMessageValueKind('team'), /catalog or adjective/);
+  assert.equal(validMessageValueText('  miracle  '), 'miracle');
+  assert.throws(() => validMessageValueText('   '), /text is required/);
 });
 
 test('admin routes reject missing and incorrect credentials', async () => {

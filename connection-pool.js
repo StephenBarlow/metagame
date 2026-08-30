@@ -219,6 +219,13 @@ class PGDB {
     return query;
   }
 
+  messageValueByIdQuery(messageValueID) {
+    return this.knex('message_values')
+      .select('*')
+      .where({ id: messageValueID, active: true })
+      .limit(1);
+  }
+
   leagueMessagesQuery(leagueID, week) {
     const query = this.knex('messages')
       .select([
@@ -547,6 +554,16 @@ class PGDB {
     await this.invalidateQueries([this.messageTemplatesQuery(null, true)]);
   }
 
+  async invalidateMessageValueCache(messageValueID) {
+    const queries = [
+      this.messageValuesQuery(),
+      this.messageValuesQuery('catalog_value'),
+      this.messageValuesQuery('adjective')
+    ];
+    if (messageValueID) queries.push(this.messageValueByIdQuery(messageValueID));
+    await this.invalidateQueries(queries);
+  }
+
   async getMessageTemplatesByIds(templateIDs) {
     if (!templateIDs.length) return [];
     return this.messageTemplatesQuery(templateIDs, false);
@@ -558,10 +575,7 @@ class PGDB {
 
   async getMessageValueById(messageValueID) {
     const rows = await this.cacheQuery(
-      this.knex('message_values')
-        .select('*')
-        .where({ id: messageValueID, active: true })
-        .limit(1),
+      this.messageValueByIdQuery(messageValueID),
       MINUTE
     );
     return rows[0];

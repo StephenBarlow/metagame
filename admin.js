@@ -517,7 +517,7 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     </tr>`).join('');
     const content = `<div class="panel"><form class="filters" method="get">
       <label>League<select name="league_id"><option value="">All leagues</option>${leagues.map(league => option(league.id, `${league.name} (${league.season})`, leagueID)).join('')}</select></label>
-      <button type="submit">Filter</button><a class="button" href="/admin/messages/templates">Edit template text</a>
+      <button type="submit">Filter</button><a class="button" href="/admin/messages/templates">Edit template text</a><a class="button" href="/admin/messages/values">Manage values</a>
     </form></div>
     <p class="muted">Invalidating a message is permanent from the admin interface and hides only that individual message from the public API.</p>
     <div class="table-wrap"><table><thead><tr><th>League</th><th>Week</th><th>Author</th><th>Message</th><th>Template</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8">No messages found.</td></tr>'}</tbody></table></div>`;
@@ -531,6 +531,69 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     redirectWithNotice(res, returnPath(req.body.return_to, '/admin/messages'), 'Message invalidated and will no longer be served.');
   });
 
+  router.get('/messages/values', async (req, res) => {
+    const values = await db('message_values').select('*').orderBy('kind').orderBy('text');
+    const rows = values.map(value => `<tr class="${value.active ? '' : 'invalidated'}">
+      <td>${value.kind === 'adjective' ? 'Adjective' : 'Catalog'}</td>
+      <td>${escapeHtml(value.text)}</td>
+      <td><code>${escapeHtml(value.key)}</code></td>
+      <td>${value.active ? 'Active' : 'Removed'}</td>
+      <td>${value.active
+        ? `<form method="post" action="/admin/messages/values/${value.id}/remove" onsubmit="return confirm('Remove this value from future messages? Existing messages will keep it.')"><button class="danger" type="submit">Remove</button></form>`
+        : `<form method="post" action="/admin/messages/values/${value.id}/restore"><button type="submit">Restore</button></form>`}</td>
+    </tr>`).join('');
+    const content = `<div class="panel"><h2>Add value</h2><form class="form-grid" method="post" action="/admin/messages/values">
+      <label>List<select name="kind"><option value="catalog_value">Catalog</option><option value="adjective">Adjective</option></select></label>
+      <label>Text<input name="text" maxlength="255" required></label>
+      <button type="submit">Add value</button>
+    </form></div>
+    <p class="muted">Removing a value hides it from future message composition without altering old messages that used it. Values have generated internal keys and their text is not editable here.</p>
+    <div class="table-wrap"><table><thead><tr><th>List</th><th>Text</th><th>Key</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5">No message values found.</td></tr>'}</tbody></table></div>
+    <p><a href="/admin/messages">Back to messages</a></p>`;
+    res.send(page('Message values', content, req.query.notice, req.query.notice_type));
+  });
+
+  router.post('/messages/values', async (req, res) => {
+    const kind = validMessageValueKind(req.body.kind);
+    const text = validMessageValueText(req.body.text);
+    const existing = await db('message_values').where({ kind, text }).first();
+    if (existing) {
+      if (existing.active) throw new AdminInputError('That value is already active in this list.');
+      await db('message_values').where({ id: existing.id }).update({
+        active: true,
+        updated_at: db.raw('CURRENT_TIMESTAMP')
+      });
+      await pg.invalidateMessageValueCache(existing.id);
+      return redirectWithNotice(res, '/admin/messages/values', 'Existing value restored.');
+    }
+    const key = await nextMessageValueKey(db, text);
+    const [created] = await db('message_values').insert({ key, kind, text }).returning('*');
+    await pg.invalidateMessageValueCache(created.id);
+    redirectWithNotice(res, '/admin/messages/values', 'Message value added.');
+  });
+
+  router.post('/messages/values/:id/remove', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Message value ID');
+    const updated = await db('message_values').where({ id, active: true }).update({
+      active: false,
+      updated_at: db.raw('CURRENT_TIMESTAMP')
+    }).returning(['id']);
+    if (!updated.length) throw new AdminInputError('Message value not found or is already removed.');
+    await pg.invalidateMessageValueCache(id);
+    redirectWithNotice(res, '/admin/messages/values', 'Message value removed from future composition.');
+  });
+
+  router.post('/messages/values/:id/restore', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Message value ID');
+    const updated = await db('message_values').where({ id, active: false }).update({
+      active: true,
+      updated_at: db.raw('CURRENT_TIMESTAMP')
+    }).returning(['id']);
+    if (!updated.length) throw new AdminInputError('Message value not found or is already active.');
+    await pg.invalidateMessageValueCache(id);
+    redirectWithNotice(res, '/admin/messages/values', 'Message value restored.');
+  });
+
   router.get('/messages/templates', async (req, res) => {
     const templates = await db('message_templates').select('*').orderBy('key');
     const rows = templates.map(template => `<tr>
@@ -541,7 +604,7 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     </tr>`).join('');
     const content = `<p class="muted">Template slots and their allowed values are fixed here. Editing the format changes the wording of messages wherever they are rendered, including existing messages.</p>
       <div class="table-wrap"><table><thead><tr><th>Key</th><th>Format</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4">No message templates found.</td></tr>'}</tbody></table></div>
-      <p><a href="/admin/messages">Back to messages</a></p>`;
+      <p><a href="/admin/messages">Back to messages</a> · <a href="/admin/messages/values">Manage values</a></p>`;
     res.send(page('Message template text', content, req.query.notice, req.query.notice_type));
   });
 
@@ -793,6 +856,34 @@ function validMessageTemplateFormat(value, slots) {
   return format;
 }
 
+function validMessageValueKind(value) {
+  if (value === 'catalog_value' || value === 'adjective') return value;
+  throw new AdminInputError('Choose either the catalog or adjective list.');
+}
+
+function validMessageValueText(value) {
+  const text = String(value ?? '').trim();
+  if (!text) throw new AdminInputError('Message value text is required.');
+  if (text.length > 255) throw new AdminInputError('Message value text must be 255 characters or fewer.');
+  return text;
+}
+
+async function nextMessageValueKey(db, text) {
+  const base = text
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (!base) throw new AdminInputError('Message value text must include at least one letter or number.');
+
+  for (let suffix = 1; suffix <= 1000; suffix += 1) {
+    const key = suffix === 1 ? base : `${base}_${suffix}`;
+    if (!(await db('message_values').where({ key }).first())) return key;
+  }
+  throw new AdminInputError('Could not generate a unique key for that message value.');
+}
+
 async function validateGamePayload(db, body) {
   const away = String(body.away_team_short_name ?? '').trim().toUpperCase();
   const home = String(body.home_team_short_name ?? '').trim().toUpperCase();
@@ -930,5 +1021,7 @@ module.exports = {
   createAdminRouter,
   parseScheduleCsv,
   parseBasicAuthorization,
-  validMessageTemplateFormat
+  validMessageTemplateFormat,
+  validMessageValueKind,
+  validMessageValueText
 };
