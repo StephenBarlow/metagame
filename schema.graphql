@@ -31,6 +31,7 @@ type InvalidatePicksResponse {
 type User {
   id: ID!
   email: String!
+  limited: Boolean!
   displayName(leagueID: ID!): String
   favoriteTeam(leagueID: ID!): SportsTeam
   fantasyLeagues: [FantasyLeague!]
@@ -71,6 +72,7 @@ type FantasyLeague {
   name: String!
   owner: User!
   users: [User!]
+  messageEligibleUsers: [User!]!
   picks: [Pick!]
   achievementAwards: [AchievementAward!]!
   messages(week: Int): [LeagueMessage!]!

@@ -106,6 +106,14 @@ class PGDB {
       .limit(1);
   }
 
+  userByIdQuery(id) {
+    return this.knex
+      .select('*')
+      .from('users')
+      .where({ id })
+      .limit(1);
+  }
+
   userDisplayNameForLeagueQuery(userID, leagueID) {
     return this.knex
       .select('display_name')
@@ -237,7 +245,8 @@ class PGDB {
         'messages.created_at',
         'authors.user_id as author_user_id',
         'authors.display_name as author_display_name',
-        'users.email as author_email'
+        'users.email as author_email',
+        'users.limited as author_limited'
       ])
       .innerJoin('memberships as authors', 'authors.id', 'messages.author_membership_id')
       .innerJoin('users', 'users.id', 'authors.user_id')
@@ -343,8 +352,18 @@ class PGDB {
     await this.invalidateQueries(queries);
   }
 
-  async invalidateUserCache(email) {
-    await this.invalidateQueries([this.userByEmailQuery(email)]);
+  async invalidateUserCache(email, userID) {
+    const queries = [this.userByEmailQuery(email)];
+    if (userID) {
+      queries.push(this.userByIdQuery(userID));
+      const memberships = await this.knex('memberships')
+        .select('league_id')
+        .where({ user_id: userID });
+      for (const membership of memberships) {
+        queries.push(this.leagueMembersQuery(membership.league_id));
+      }
+    }
+    await this.invalidateQueries(queries);
   }
 
   async invalidateLeagueCache(leagueID) {
@@ -416,13 +435,7 @@ class PGDB {
 
   async getUserById(id) {
     const val = await this.cacheQuery(
-      this.knex
-        .select('*')
-        .from('users')
-        .where({
-          'id': id
-        })
-        .limit(1),
+      this.userByIdQuery(id),
       HOUR
     );
     if (val.length) {

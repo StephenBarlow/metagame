@@ -234,6 +234,12 @@ const resolvers = {
       }
 
     },
+    async messageEligibleUsers(league, args, context) {
+      const users = context.users || await context.dataSources.pg.getLeagueMembers(league.id);
+      return users
+        .filter(user => !user.limited)
+        .map(userFromRow);
+    },
     async picks(league, args, context, info) {
       if (context.picks) {
         return context.picks.map(function(row) {
@@ -564,6 +570,7 @@ function userFromRow(row) {
   return {
     id: row.user_id,
     email: row.email,
+    limited: Boolean(row.limited),
     displayName: row.display_name,
 
     // Not schema fields, but used by the league-scoped favoriteTeam resolver.

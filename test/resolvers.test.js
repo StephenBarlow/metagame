@@ -474,3 +474,60 @@ test('league messages are readable regardless of revealed week and expose curren
   assert.equal(messages[0].template.format, 'Behold, {subject}!');
   assert.equal(messages[0].selections[0].value.text, 'chaos');
 });
+
+test('limited league members are excluded from message template people', async () => {
+  const users = await resolvers.FantasyLeague.messageEligibleUsers({ id: 2 }, {}, {
+    users: [
+      { user_id: 1, email: 'available@example.com', display_name: 'Available', limited: false },
+      { user_id: 2, email: 'limited@example.com', display_name: 'Limited', limited: true }
+    ]
+  });
+
+  assert.deepEqual(users, [{
+    id: 1,
+    email: 'available@example.com',
+    limited: false,
+    displayName: 'Available',
+    favoriteTeamID: undefined,
+    membershipLeagueID: undefined
+  }]);
+});
+
+test('message submission rejects a limited player selected by ID', async (t) => {
+  const originalSeason = process.env.CURRENT_SEASON;
+  process.env.CURRENT_SEASON = '2026';
+  t.after(() => { process.env.CURRENT_SEASON = originalSeason; });
+  const response = await resolvers.Mutation.submitMessage(null, {
+    request: {
+      userID: 1,
+      leagueID: 2,
+      week: 4,
+      templateID: 7,
+      selections: [{ slotID: 71, valueType: 'LEAGUE_MEMBER', valueID: 3 }]
+    }
+  }, {
+    dataSources: {
+      pg: {
+        getLeagueById: async () => ({ id: 2, season: '2026', current_week: 4, sports_league: 'NFL' }),
+        getMembership: async userID => ({ id: userID === 1 ? 11 : 13, user_id: userID, league_id: 2, display_name: 'Player' }),
+        getUserById: async userID => ({ id: userID, email: `${userID}@example.com`, limited: userID === 3 }),
+        getMessageTemplateById: async () => [{
+          template_id: 7,
+          template_key: 'PLAYER_ONLY',
+          template_format: '{player}',
+          slot_id: 71,
+          slot_key: 'player',
+          slot_position: 0,
+          slot_prompt: 'Player',
+          slot_value_type: 'league_member'
+        }],
+        submitMessage: async () => { throw new Error('A limited player must not be stored.'); }
+      }
+    }
+  });
+
+  assert.deepEqual(response, {
+    message: null,
+    errors: [{ code: 'ERR_INVALID_INPUT', message: 'The selected player is not available as a message value.' }]
+  });
+});

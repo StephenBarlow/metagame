@@ -237,6 +237,7 @@ function messageUser(user, membership) {
     __typename: 'User',
     id: user.id ?? membership.user_id,
     email: user.email,
+    limited: Boolean(user.limited),
     displayName: membership.display_name,
     favoriteTeamID: membership.favorite_team_id,
     membershipLeagueID: membership.league_id
@@ -279,6 +280,7 @@ async function resolveSubmittedMessageValue(pg, league, leagueID, valueType, val
     pg.getUserById(valueID)
   ]);
   if (!membership || !user) return { error: 'The selected player is not an active member of this league.' };
+  if (user.limited) return { error: 'The selected player is not available as a message value.' };
   return {
     text: membership.display_name,
     leagueMembershipID: membership.id,
@@ -352,6 +354,7 @@ function leagueMessagesFromRows(messageRows, selectionRows, templateRows) {
       __typename: 'User',
       id: row.author_user_id,
       email: row.author_email,
+      limited: Boolean(row.author_limited),
       displayName: row.author_display_name,
       membershipLeagueID: row.league_id
     },

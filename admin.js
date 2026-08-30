@@ -760,19 +760,33 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
 
   router.get('/users', async (req, res) => {
     const users = await db('users').select('*').orderBy('email');
-    const rows = users.map(user => `<tr><td>${escapeHtml(user.id)}</td><td>${escapeHtml(user.email)}</td></tr>`).join('');
+    const rows = users.map(user => `<tr><td>${escapeHtml(user.id)}</td><td>${escapeHtml(user.email)}</td><td>
+      <form class="filters" method="post" action="/admin/users/${user.id}/limited">
+        <label><input name="limited" type="checkbox"${user.limited ? ' checked' : ''}> Limited</label><button type="submit">Save</button>
+      </form>
+    </td></tr>`).join('');
     const content = `<div class="panel"><h2>Create user</h2><form class="form-grid" method="post" action="/admin/users">
-      <label>Email<input name="email" type="email" required></label><button type="submit">Create user</button></form></div>
-      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Email</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <label>Email<input name="email" type="email" required></label><label><input name="limited" type="checkbox"> Limited</label><button type="submit">Create user</button></form></div>
+      <p class="muted">Limited users remain league members but are unavailable as people in message templates.</p>
+      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Email</th><th>Message availability</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     res.send(page('Users', content, req.query.notice, req.query.notice_type));
   });
 
   router.post('/users', async (req, res) => {
     const email = String(req.body.email ?? '').trim().toLowerCase();
     if (!emailValidator.validate(email)) throw new AdminInputError('Enter a valid email address.');
-    await db('users').insert({ email });
+    await db('users').insert({ email, limited: req.body.limited === 'on' });
     await pg.invalidateUserCache(email);
     redirectWithNotice(res, '/admin/users', 'User created.');
+  });
+
+  router.post('/users/:id/limited', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'User ID');
+    const user = await db('users').where({ id }).first();
+    if (!user) throw new AdminInputError('User not found.');
+    await db('users').where({ id }).update({ limited: req.body.limited === 'on' });
+    await pg.invalidateUserCache(user.email, id);
+    redirectWithNotice(res, '/admin/users', 'User message availability updated.');
   });
 
   router.get('/achievements', async (req, res) => {
