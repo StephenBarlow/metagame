@@ -660,6 +660,16 @@ class PGDB {
     });
   }
 
+  async invalidateMessages(messageIDs) {
+    return this.knex('messages')
+      .whereIn('id', messageIDs)
+      .whereNull('invalidated_at')
+      .update({
+        invalidated_at: this.knex.raw('CURRENT_TIMESTAMP')
+      })
+      .returning(['id']);
+  }
+
   async invalidatePicks(pickIDs) {
     const knex = this.knex;
     const invalidatedPicks = await knex('picks')

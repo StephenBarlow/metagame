@@ -113,6 +113,7 @@ function page(title, content, notice, noticeType = 'success') {
     <a href="/admin/teams">Teams & tags</a>
     <a href="/admin/schedule">Schedule import</a>
     <a href="/admin/picks">Picks</a>
+    <a href="/admin/messages">Messages</a>
     <a href="/admin/achievements">Achievements</a>
     <a href="/admin/leagues">Leagues</a>
     <a href="/admin/users">Users</a>
@@ -471,6 +472,63 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     const id = requiredInteger(req.params.id, 'Pick ID');
     await pg.invalidatePicks([id]);
     redirectWithNotice(res, returnPath(req.body.return_to, '/admin/picks'), 'Pick invalidated.');
+  });
+
+  router.get('/messages', async (req, res) => {
+    const leagueID = req.query.league_id ? requiredInteger(req.query.league_id, 'League ID') : null;
+    const [leagues, messages] = await Promise.all([
+      db('fantasy_leagues').select('*').orderBy('season', 'desc').orderBy('name'),
+      (() => {
+        const query = db('messages as messages')
+          .innerJoin('fantasy_leagues as leagues', 'leagues.id', 'messages.league_id')
+          .innerJoin('memberships as authors', 'authors.id', 'messages.author_membership_id')
+          .innerJoin('users as users', 'users.id', 'authors.user_id')
+          .leftJoin('message_templates as templates', 'templates.id', 'messages.template_id')
+          .select([
+            'messages.id',
+            'messages.week',
+            'messages.rendered_text',
+            'messages.created_at',
+            'messages.invalidated_at',
+            'leagues.id as league_id',
+            'leagues.name as league_name',
+            'leagues.season as league_season',
+            'authors.display_name as author_display_name',
+            'users.email as author_email',
+            'templates.key as template_key'
+          ])
+          .orderBy('messages.created_at', 'desc')
+          .orderBy('messages.id', 'desc');
+        if (leagueID) query.where('messages.league_id', leagueID);
+        return query;
+      })()
+    ]);
+
+    const rows = messages.map(message => `<tr class="${message.invalidated_at ? 'invalidated' : ''}">
+      <td>${escapeHtml(message.league_name)} <span class="muted">(${escapeHtml(message.league_season)})</span></td>
+      <td>${escapeHtml(message.week)}</td>
+      <td>${escapeHtml(message.author_display_name || message.author_email)}</td>
+      <td>${escapeHtml(message.rendered_text)}</td>
+      <td><code>${escapeHtml(message.template_key || '—')}</code></td>
+      <td>${escapeHtml(formatTimestamp(message.created_at))}</td>
+      <td>${message.invalidated_at ? `Invalidated ${escapeHtml(formatTimestamp(message.invalidated_at))}` : 'Active'}</td>
+      <td>${message.invalidated_at ? '' : `<form method="post" action="/admin/messages/${message.id}/invalidate" onsubmit="return confirm('Invalidate this message? It will no longer be served to players.')">
+        <input type="hidden" name="return_to" value="/admin/messages${leagueID ? `?league_id=${leagueID}` : ''}"><button class="danger" type="submit">Invalidate</button></form>`}</td>
+    </tr>`).join('');
+    const content = `<div class="panel"><form class="filters" method="get">
+      <label>League<select name="league_id"><option value="">All leagues</option>${leagues.map(league => option(league.id, `${league.name} (${league.season})`, leagueID)).join('')}</select></label>
+      <button type="submit">Filter</button>
+    </form></div>
+    <p class="muted">Invalidating a message is permanent from the admin interface and hides only that individual message from the public API.</p>
+    <div class="table-wrap"><table><thead><tr><th>League</th><th>Week</th><th>Author</th><th>Message</th><th>Template</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8">No messages found.</td></tr>'}</tbody></table></div>`;
+    res.send(page('Messages', content, req.query.notice, req.query.notice_type));
+  });
+
+  router.post('/messages/:id/invalidate', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Message ID');
+    const invalidated = await pg.invalidateMessages([id]);
+    if (!invalidated.length) throw new AdminInputError('Message not found or is already invalidated.');
+    redirectWithNotice(res, returnPath(req.body.return_to, '/admin/messages'), 'Message invalidated and will no longer be served.');
   });
 
   router.get('/leagues', async (req, res) => {
