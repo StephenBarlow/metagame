@@ -76,6 +76,29 @@ test('read methods build valid PostgreSQL queries without executing them', async
   assert.ok(queries.every(({ sql }) => sql.startsWith('select')));
 });
 
+test('message read queries build valid PostgreSQL without executing them', async (t) => {
+  const db = new PGDB(knexConfig, {
+    get: async () => undefined,
+    set: async () => {},
+    delete: async () => {}
+  });
+  t.after(() => db.knex.destroy());
+
+  const queries = [
+    db.messageTemplatesQuery(null, true),
+    db.messageTemplatesQuery([1, 2], false),
+    db.messageValuesQuery('adjective'),
+    db.leagueMessagesQuery(3, 4),
+    db.messageSelectionsQuery([8, 9])
+  ].map(query => query.toSQL());
+
+  assert.ok(queries.every(({ method }) => method === 'select'));
+  assert.ok(queries.every(({ sql }) => sql.startsWith('select')));
+  assert.match(queries[0].sql, /message_template_slot_value_types/);
+  assert.match(queries[3].sql, /messages.*week/);
+  assert.match(queries[4].sql, /message_selections/);
+});
+
 test('pick cache invalidation deletes each affected query once', async (t) => {
   const originalRevealedWeek = process.env.REVEALED_WEEK;
   process.env.REVEALED_WEEK = '6';

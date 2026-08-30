@@ -73,6 +73,7 @@ type FantasyLeague {
   users: [User!]
   picks: [Pick!]
   achievementAwards: [AchievementAward!]!
+  messages(week: Int): [LeagueMessage!]!
   gameMode: GameMode!
   currentWeek: Int!
   revealedWeek: Int!
@@ -93,6 +94,75 @@ type AchievementAward {
   awardedAt: String!
   user: User!
   achievement: Achievement!
+}
+
+enum MessageValueKind {
+  CATALOG_VALUE
+  ADJECTIVE
+}
+
+enum MessageSlotValueType {
+  CATALOG_VALUE
+  ADJECTIVE
+  LEAGUE_MEMBER
+  TEAM
+}
+
+type MessageValue {
+  id: ID!
+  key: String!
+  text: String!
+  kind: MessageValueKind!
+}
+
+type MessageTemplateSlot {
+  id: ID!
+  key: String!
+  position: Int!
+  prompt: String
+  valueTypes: [MessageSlotValueType!]!
+}
+
+type MessageTemplate {
+  id: ID!
+  key: String!
+  format: String!
+  slots: [MessageTemplateSlot!]!
+}
+
+union MessageSelectionValue = MessageValue | SportsTeam | User
+
+type LeagueMessageSelection {
+  slot: MessageTemplateSlot!
+  value: MessageSelectionValue!
+}
+
+type LeagueMessage {
+  id: ID!
+  week: Int!
+  createdAt: String!
+  author: User!
+  template: MessageTemplate!
+  selections: [LeagueMessageSelection!]!
+}
+
+input SubmitMessageSelection {
+  slotID: ID!
+  valueType: MessageSlotValueType!
+  valueID: ID!
+}
+
+input SubmitMessageRequest {
+  userID: ID!
+  leagueID: ID!
+  week: Int!
+  templateID: ID!
+  selections: [SubmitMessageSelection!]!
+}
+
+type SubmitMessageResponse {
+  message: LeagueMessage
+  errors: [Error!]
 }
 
 input CreateFantasyLeagueRequest {
@@ -148,6 +218,8 @@ type Query {
   user(email: String!): User
   league(leagueID: ID!): FantasyLeague
   leagues(userID: String): [FantasyLeague!]
+  messageTemplates: [MessageTemplate!]!
+  messageValues(kind: MessageValueKind): [MessageValue!]!
   currentPick(leagueID: ID!, userID: ID!): [Pick!]
   picksForUser(leagueID: ID!, userID: ID!): [Pick!]
   sportsTeams(league: SportsLeague): [SportsTeam!]
@@ -160,6 +232,7 @@ type Mutation {
   #createFantasyLeague(request: CreateFantasyLeagueRequest!): CreateFantasyLeagueResponse
   #addUserToFantasyLeague(request: AddUserToFantasyLeagueRequest!): AddUserToFantasyLeagueResponse
   setFavoriteTeam(request: SetFavoriteTeamRequest!): SetFavoriteTeamResponse
+  submitMessage(request: SubmitMessageRequest!): SubmitMessageResponse
   submitPick(request: SubmitPickRequest!): SubmitPickResponse
   invalidatePicks(request: InvalidatePicksRequest!): InvalidatePicksResponse
   #createSportsGame(request: CreateSportsGameRequest!): CreateSportsGameResponse

@@ -1,5 +1,6 @@
 const emailValidator = require('email-validator');
 const { assertDirective } = require('graphql');
+const messageResolvers = require('./messages');
 
 const PG_UNIQUE_VIOLATION = '23505';
 const GQL_UNKNOWN_ERROR = 'ERR_UNKNOWN'
@@ -54,6 +55,8 @@ const resolvers = {
         console.log(err.stack);
       }
     },
+    messageTemplates: messageResolvers.messageTemplates,
+    messageValues: messageResolvers.messageValues,
     async sportsTeams(parent, args, { dataSources }, info) {
       try {
         const result = await dataSources.pg.getTeams();
@@ -102,6 +105,7 @@ const resolvers = {
     }
   },
   Mutation: {
+    submitMessage: messageResolvers.submitMessage,
     async setFavoriteTeam(parent, { request }, { dataSources }) {
       const userID = Number(request.userID);
       const leagueID = Number(request.leagueID);
@@ -243,7 +247,11 @@ const resolvers = {
     async achievementAwards(league, args, { dataSources, awards }) {
       const rows = awards || await dataSources.pg.getAchievementAwardsForLeague(league.id);
       return rows.map(achievementAwardFromRow);
-    }
+    },
+    messages: messageResolvers.leagueMessages
+  },
+  MessageSelectionValue: {
+    __resolveType: messageResolvers.resolveMessageSelectionValueType
   },
   Pick: {
     async user(pick, args, context, info) {

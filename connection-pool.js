@@ -186,6 +186,96 @@ class PGDB {
       .orderBy('achievement_awards.id', 'desc');
   }
 
+  messageTemplatesQuery(templateIDs, activeOnly = true) {
+    const query = this.knex('message_templates as templates')
+      .select([
+        'templates.id as template_id',
+        'templates.key as template_key',
+        'templates.format as template_format',
+        'templates.active as template_active',
+        'slots.id as slot_id',
+        'slots.key as slot_key',
+        'slots.position as slot_position',
+        'slots.prompt as slot_prompt',
+        'slot_types.value_type as slot_value_type'
+      ])
+      .leftJoin('message_template_slots as slots', 'slots.template_id', 'templates.id')
+      .leftJoin('message_template_slot_value_types as slot_types', 'slot_types.template_slot_id', 'slots.id')
+      .orderBy('templates.id')
+      .orderBy('slots.position')
+      .orderBy('slot_types.value_type');
+
+    if (activeOnly) query.where('templates.active', true);
+    if (templateIDs) query.whereIn('templates.id', templateIDs);
+    return query;
+  }
+
+  messageValuesQuery(kind) {
+    const query = this.knex('message_values')
+      .select('*')
+      .where({ active: true })
+      .orderBy('text');
+    if (kind) query.where('kind', kind);
+    return query;
+  }
+
+  leagueMessagesQuery(leagueID, week) {
+    const query = this.knex('messages')
+      .select([
+        'messages.id as message_id',
+        'messages.league_id',
+        'messages.week',
+        'messages.template_id',
+        'messages.author_membership_id',
+        'messages.created_at',
+        'authors.user_id as author_user_id',
+        'authors.display_name as author_display_name',
+        'users.email as author_email'
+      ])
+      .innerJoin('memberships as authors', 'authors.id', 'messages.author_membership_id')
+      .innerJoin('users', 'users.id', 'authors.user_id')
+      .where({
+        'messages.league_id': leagueID,
+        'messages.invalidated_at': null
+      })
+      .orderBy('messages.created_at', 'desc')
+      .orderBy('messages.id', 'desc');
+
+    if (week !== null && week !== undefined) query.where('messages.week', week);
+    return query;
+  }
+
+  messageSelectionsQuery(messageIDs) {
+    return this.knex('message_selections as selections')
+      .select([
+        'selections.id as selection_id',
+        'selections.message_id',
+        'selections.template_slot_id',
+        'selections.message_value_id',
+        'selections.league_membership_id',
+        'selections.team_id',
+        'slots.position as slot_position',
+        'values.key as message_value_key',
+        'values.kind as message_value_kind',
+        'values.text as message_value_text',
+        'selected_members.user_id as selected_user_id',
+        'selected_members.league_id as selected_user_league_id',
+        'selected_members.display_name as selected_user_display_name',
+        'selected_users.email as selected_user_email',
+        'teams.name as team_name',
+        'teams.short_name as team_short_name',
+        'teams.sports_league as team_sports_league'
+      ])
+      .innerJoin('message_template_slots as slots', 'slots.id', 'selections.template_slot_id')
+      .leftJoin('message_values as values', 'values.id', 'selections.message_value_id')
+      .leftJoin('memberships as selected_members', 'selected_members.id', 'selections.league_membership_id')
+      .leftJoin('users as selected_users', 'selected_users.id', 'selected_members.user_id')
+      .leftJoin('teams', 'teams.id', 'selections.team_id')
+      .whereIn('selections.message_id', messageIDs)
+      .orderBy('selections.message_id')
+      .orderBy('slots.position');
+  }
+
   leagueOwnerQuery(leagueID, ownerID) {
     return this.knex
       .select('*')
@@ -445,6 +535,43 @@ class PGDB {
     return this.achievementAwardsForLeagueQuery(leagueID);
   }
 
+  async getMessageTemplates() {
+    return this.cacheQuery(this.messageTemplatesQuery(null, true), MINUTE);
+  }
+
+  async getMessageTemplateById(templateID) {
+    return this.messageTemplatesQuery([templateID], true);
+  }
+
+  async getMessageTemplatesByIds(templateIDs) {
+    if (!templateIDs.length) return [];
+    return this.messageTemplatesQuery(templateIDs, false);
+  }
+
+  async getMessageValues(kind) {
+    return this.cacheQuery(this.messageValuesQuery(kind), MINUTE);
+  }
+
+  async getMessageValueById(messageValueID) {
+    const rows = await this.cacheQuery(
+      this.knex('message_values')
+        .select('*')
+        .where({ id: messageValueID, active: true })
+        .limit(1),
+      MINUTE
+    );
+    return rows[0];
+  }
+
+  async getLeagueMessages(leagueID, week) {
+    return this.leagueMessagesQuery(leagueID, week);
+  }
+
+  async getMessageSelections(messageIDs) {
+    if (!messageIDs.length) return [];
+    return this.messageSelectionsQuery(messageIDs);
+  }
+
   async getPicksForLeague(leagueID, leagueConcluded = false, revealedWeek) {
     const val = await this.cacheQuery(
       this.picksForLeagueQuery(leagueID, leagueConcluded, revealedWeek),
@@ -506,6 +633,31 @@ class PGDB {
 
     await this.invalidatePickCache(responseRows);
     return responseRows;
+  }
+
+  async submitMessage(message, selections) {
+    return this.knex.transaction(async trx => {
+      const insertedMessages = await trx('messages')
+        .insert({
+          league_id: message.leagueID,
+          week: message.week,
+          author_membership_id: message.authorMembershipID,
+          template_id: message.templateID,
+          rendered_text: message.renderedText
+        })
+        .returning('*');
+      const insertedMessage = insertedMessages[0];
+
+      await trx('message_selections').insert(selections.map(selection => ({
+        message_id: insertedMessage.id,
+        template_slot_id: selection.templateSlotID,
+        message_value_id: selection.messageValueID ?? null,
+        league_membership_id: selection.leagueMembershipID ?? null,
+        team_id: selection.teamID ?? null
+      })));
+
+      return insertedMessage;
+    });
   }
 
   async invalidatePicks(pickIDs) {

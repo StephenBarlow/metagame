@@ -210,3 +210,267 @@ test('league achievement awards include the recipient, unlock week, and full ach
     }
   }]);
 });
+
+test('message composer data exposes active templates, typed slots, and separate value catalogs', async (t) => {
+  const server = new ApolloServer({ typeDefs, resolvers });
+  t.after(() => server.stop());
+  const templateRows = [
+    {
+      template_id: 1,
+      template_key: 'SUBJECT_ADJECTIVE',
+      template_format: '{subject}? {adjective}!',
+      slot_id: 10,
+      slot_key: 'subject',
+      slot_position: 0,
+      slot_prompt: 'Player, team, or catalog entry',
+      slot_value_type: 'catalog_value'
+    },
+    {
+      template_id: 1,
+      template_key: 'SUBJECT_ADJECTIVE',
+      template_format: '{subject}? {adjective}!',
+      slot_id: 10,
+      slot_key: 'subject',
+      slot_position: 0,
+      slot_prompt: 'Player, team, or catalog entry',
+      slot_value_type: 'league_member'
+    },
+    {
+      template_id: 1,
+      template_key: 'SUBJECT_ADJECTIVE',
+      template_format: '{subject}? {adjective}!',
+      slot_id: 11,
+      slot_key: 'adjective',
+      slot_position: 1,
+      slot_prompt: 'Adjective',
+      slot_value_type: 'adjective'
+    }
+  ];
+  const requestedKinds = [];
+  const response = await server.executeOperation({
+    query: `query Composer {
+      messageTemplates {
+        id
+        key
+        format
+        slots { id key position prompt valueTypes }
+      }
+      catalog: messageValues(kind: CATALOG_VALUE) { id key text kind }
+      adjectives: messageValues(kind: ADJECTIVE) { id key text kind }
+    }`
+  }, {
+    contextValue: {
+      dataSources: {
+        pg: {
+          getMessageTemplates: async () => templateRows,
+          getMessageValues: async kind => {
+            requestedKinds.push(kind);
+            return kind === 'adjective'
+              ? [{ id: 3, key: 'INCREDIBLE', text: 'incredible', kind }]
+              : [{ id: 2, key: 'CHAOS', text: 'chaos', kind }];
+          }
+        }
+      }
+    }
+  });
+
+  assert.equal(response.body.kind, 'single');
+  assert.deepEqual(requestedKinds.sort(), ['adjective', 'catalog_value']);
+  assert.deepEqual(JSON.parse(JSON.stringify(response.body.singleResult.data)), {
+    messageTemplates: [{
+      id: '1',
+      key: 'SUBJECT_ADJECTIVE',
+      format: '{subject}? {adjective}!',
+      slots: [
+        {
+          id: '10',
+          key: 'subject',
+          position: 0,
+          prompt: 'Player, team, or catalog entry',
+          valueTypes: ['CATALOG_VALUE', 'LEAGUE_MEMBER']
+        },
+        {
+          id: '11',
+          key: 'adjective',
+          position: 1,
+          prompt: 'Adjective',
+          valueTypes: ['ADJECTIVE']
+        }
+      ]
+    }],
+    catalog: [{ id: '2', key: 'CHAOS', text: 'chaos', kind: 'CATALOG_VALUE' }],
+    adjectives: [{ id: '3', key: 'INCREDIBLE', text: 'incredible', kind: 'ADJECTIVE' }]
+  });
+});
+
+test('submitMessage validates and stores typed selections while returning structured content', async (t) => {
+  const originalSeason = process.env.CURRENT_SEASON;
+  process.env.CURRENT_SEASON = '2026';
+  t.after(() => { process.env.CURRENT_SEASON = originalSeason; });
+  const server = new ApolloServer({ typeDefs, resolvers });
+  t.after(() => server.stop());
+  let stored;
+  const response = await server.executeOperation({
+    query: `mutation SubmitMessage($request: SubmitMessageRequest!, $leagueID: ID!) {
+      submitMessage(request: $request) {
+        message {
+          id
+          week
+          createdAt
+          author { id displayName(leagueID: $leagueID) }
+          template { id key format }
+          selections {
+            slot { id key position }
+            value {
+              __typename
+              ... on MessageValue { id key text kind }
+              ... on User { id displayName(leagueID: $leagueID) }
+            }
+          }
+        }
+        errors { code message }
+      }
+    }`,
+    variables: {
+      leagueID: '2',
+      request: {
+        userID: '1',
+        leagueID: '2',
+        week: 4,
+        templateID: '7',
+        selections: [
+          { slotID: '70', valueType: 'ADJECTIVE', valueID: '8' },
+          { slotID: '71', valueType: 'LEAGUE_MEMBER', valueID: '3' }
+        ]
+      }
+    }
+  }, {
+    contextValue: {
+      dataSources: {
+        pg: {
+          getLeagueById: async () => ({ id: 2, season: '2026', current_week: 4, sports_league: 'NFL' }),
+          getMembership: async userID => userID === 1
+            ? { id: 11, user_id: 1, league_id: 2, display_name: 'Author' }
+            : { id: 13, user_id: 3, league_id: 2, display_name: 'Rival' },
+          getUserById: async userID => ({ id: userID, email: `${userID}@example.com` }),
+          getMessageTemplateById: async () => [
+            {
+              template_id: 7,
+              template_key: 'ADJECTIVE_PICK',
+              template_format: '{adjective} pick, {player}!',
+              slot_id: 70,
+              slot_key: 'adjective',
+              slot_position: 0,
+              slot_prompt: 'Adjective',
+              slot_value_type: 'adjective'
+            },
+            {
+              template_id: 7,
+              template_key: 'ADJECTIVE_PICK',
+              template_format: '{adjective} pick, {player}!',
+              slot_id: 71,
+              slot_key: 'player',
+              slot_position: 1,
+              slot_prompt: 'Player',
+              slot_value_type: 'league_member'
+            }
+          ],
+          getMessageValueById: async () => ({ id: 8, key: 'INCREDIBLE', text: 'incredible', kind: 'adjective' }),
+          submitMessage: async (message, selections) => {
+            stored = { message, selections };
+            return { id: 20, week: 4, created_at: '2026-09-20T12:00:00.000Z' };
+          }
+        }
+      }
+    }
+  });
+
+  assert.equal(response.body.kind, 'single');
+  assert.deepEqual(stored, {
+    message: {
+      leagueID: 2,
+      week: 4,
+      authorMembershipID: 11,
+      templateID: 7,
+      renderedText: 'incredible pick, Rival!'
+    },
+    selections: [
+      { templateSlotID: 70, messageValueID: 8, leagueMembershipID: undefined, teamID: undefined },
+      { templateSlotID: 71, messageValueID: undefined, leagueMembershipID: 13, teamID: undefined }
+    ]
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(response.body.singleResult.data.submitMessage)), {
+    message: {
+      id: '20',
+      week: 4,
+      createdAt: '2026-09-20T12:00:00.000Z',
+      author: { id: '1', displayName: 'Author' },
+      template: { id: '7', key: 'ADJECTIVE_PICK', format: '{adjective} pick, {player}!' },
+      selections: [
+        {
+          slot: { id: '70', key: 'adjective', position: 0 },
+          value: { __typename: 'MessageValue', id: '8', key: 'INCREDIBLE', text: 'incredible', kind: 'ADJECTIVE' }
+        },
+        {
+          slot: { id: '71', key: 'player', position: 1 },
+          value: { __typename: 'User', id: '3', displayName: 'Rival' }
+        }
+      ]
+    },
+    errors: []
+  });
+});
+
+test('league messages are readable regardless of revealed week and expose current templates with selections', async () => {
+  const originalSeason = process.env.CURRENT_SEASON;
+  process.env.CURRENT_SEASON = '2026';
+  let requestedVisibility;
+  const messages = await resolvers.FantasyLeague.messages({
+    id: 2,
+    season: '2026',
+    revealedWeek: 0
+  }, { week: 3 }, {
+    dataSources: {
+      pg: {
+        getLeagueMessages: async (leagueID, week) => {
+          requestedVisibility = { leagueID, week };
+          return [{
+            message_id: 9,
+            league_id: 2,
+            week: 3,
+            template_id: 4,
+            created_at: '2026-09-10T12:00:00.000Z',
+            author_user_id: 1,
+            author_display_name: 'Author',
+            author_email: 'author@example.com'
+          }];
+        },
+        getMessageSelections: async () => [{
+          message_id: 9,
+          template_slot_id: 40,
+          message_value_id: 12,
+          message_value_key: 'CHAOS',
+          message_value_kind: 'catalog_value',
+          message_value_text: 'chaos',
+          league_membership_id: null,
+          team_id: null
+        }],
+        getMessageTemplatesByIds: async () => [{
+          template_id: 4,
+          template_key: 'BEHOLD',
+          template_format: 'Behold, {subject}!',
+          slot_id: 40,
+          slot_key: 'subject',
+          slot_position: 0,
+          slot_prompt: 'Player, team, or outcome',
+          slot_value_type: 'catalog_value'
+        }]
+      }
+    }
+  });
+  process.env.CURRENT_SEASON = originalSeason;
+
+  assert.deepEqual(requestedVisibility, { leagueID: 2, week: 3 });
+  assert.equal(messages[0].template.format, 'Behold, {subject}!');
+  assert.equal(messages[0].selections[0].value.text, 'chaos');
+});
