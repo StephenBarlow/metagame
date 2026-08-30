@@ -517,7 +517,7 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     </tr>`).join('');
     const content = `<div class="panel"><form class="filters" method="get">
       <label>League<select name="league_id"><option value="">All leagues</option>${leagues.map(league => option(league.id, `${league.name} (${league.season})`, leagueID)).join('')}</select></label>
-      <button type="submit">Filter</button>
+      <button type="submit">Filter</button><a class="button" href="/admin/messages/templates">Edit template text</a>
     </form></div>
     <p class="muted">Invalidating a message is permanent from the admin interface and hides only that individual message from the public API.</p>
     <div class="table-wrap"><table><thead><tr><th>League</th><th>Week</th><th>Author</th><th>Message</th><th>Template</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8">No messages found.</td></tr>'}</tbody></table></div>`;
@@ -529,6 +529,46 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     const invalidated = await pg.invalidateMessages([id]);
     if (!invalidated.length) throw new AdminInputError('Message not found or is already invalidated.');
     redirectWithNotice(res, returnPath(req.body.return_to, '/admin/messages'), 'Message invalidated and will no longer be served.');
+  });
+
+  router.get('/messages/templates', async (req, res) => {
+    const templates = await db('message_templates').select('*').orderBy('key');
+    const rows = templates.map(template => `<tr>
+      <td><code>${escapeHtml(template.key)}</code></td>
+      <td>${escapeHtml(template.format)}</td>
+      <td>${template.active ? 'Active' : 'Inactive'}</td>
+      <td><a href="/admin/messages/templates/${template.id}/edit">Edit text</a></td>
+    </tr>`).join('');
+    const content = `<p class="muted">Template slots and their allowed values are fixed here. Editing the format changes the wording of messages wherever they are rendered, including existing messages.</p>
+      <div class="table-wrap"><table><thead><tr><th>Key</th><th>Format</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4">No message templates found.</td></tr>'}</tbody></table></div>
+      <p><a href="/admin/messages">Back to messages</a></p>`;
+    res.send(page('Message template text', content, req.query.notice, req.query.notice_type));
+  });
+
+  router.get('/messages/templates/:id/edit', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Message template ID');
+    const [template, slots] = await Promise.all([
+      db('message_templates').where({ id }).first(),
+      db('message_template_slots').where({ template_id: id }).orderBy('position')
+    ]);
+    if (!template) return res.status(404).send(page('Message template not found', '<p>No message template has that ID.</p>'));
+    res.send(page(`Edit ${template.key} text`, messageTemplateForm(template, slots), req.query.notice, req.query.notice_type));
+  });
+
+  router.post('/messages/templates/:id', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Message template ID');
+    const [template, slots] = await Promise.all([
+      db('message_templates').where({ id }).first(),
+      db('message_template_slots').where({ template_id: id }).orderBy('position')
+    ]);
+    if (!template) throw new AdminInputError('Message template not found.');
+    const format = validMessageTemplateFormat(req.body.format, slots);
+    await db('message_templates').where({ id }).update({
+      format,
+      updated_at: db.raw('CURRENT_TIMESTAMP')
+    });
+    await pg.invalidateMessageTemplateCache();
+    redirectWithNotice(res, `/admin/messages/templates/${id}/edit`, 'Message template text updated.');
   });
 
   router.get('/leagues', async (req, res) => {
@@ -732,6 +772,27 @@ function activeMembersQuery(db, leagueID) {
     .orderBy('memberships.display_name');
 }
 
+function validMessageTemplateFormat(value, slots) {
+  const format = String(value ?? '');
+  if (!format.trim()) throw new AdminInputError('Message template text is required.');
+  if (format.length > 10000) throw new AdminInputError('Message template text must be 10,000 characters or fewer.');
+
+  const placeholderPattern = /\{([A-Za-z0-9_]+)\}/g;
+  const placeholders = [...format.matchAll(placeholderPattern)].map(match => match[1]);
+  const staticText = format.replace(placeholderPattern, '');
+  if (staticText.includes('{') || staticText.includes('}')) {
+    throw new AdminInputError('Dynamic placeholders must use the form {slot_key}.');
+  }
+
+  const expected = slots.map(slot => slot.key).sort();
+  const actual = [...placeholders].sort();
+  if (expected.length !== actual.length || expected.some((key, index) => key !== actual[index])) {
+    const requiredPlaceholders = expected.map(key => `{${key}}`).join(', ') || 'none';
+    throw new AdminInputError(`Keep each dynamic placeholder exactly once: ${requiredPlaceholders}.`);
+  }
+  return format;
+}
+
 async function validateGamePayload(db, body) {
   const away = String(body.away_team_short_name ?? '').trim().toUpperCase();
   const home = String(body.home_team_short_name ?? '').trim().toUpperCase();
@@ -844,6 +905,17 @@ function achievementForm(achievement) {
   </form></div><p><a href="/admin/achievements">Back to achievements</a></p>`;
 }
 
+function messageTemplateForm(template, slots) {
+  const placeholders = slots.map(slot => `<code>{${escapeHtml(slot.key)}}</code> (${escapeHtml(slot.prompt || slot.key)})`).join(', ');
+  return `<div class="panel"><form method="post" action="/admin/messages/templates/${template.id}">
+    <p><strong>Template key:</strong> <code>${escapeHtml(template.key)}</code></p>
+    <p class="muted">Keep each dynamic placeholder exactly once. You can change any surrounding wording and punctuation.</p>
+    <p><strong>Required placeholders:</strong> ${placeholders || '<span class="muted">None</span>'}</p>
+    <label>Template text<textarea name="format" maxlength="10000" required>${escapeHtml(template.format)}</textarea></label>
+    <button type="submit">Save template text</button>
+  </form></div><p><a href="/admin/messages/templates">Back to message templates</a></p>`;
+}
+
 function scheduleForm(season = process.env.CURRENT_SEASON ?? '', csv = '') {
   return `<div class="panel"><p>Paste CSV with four columns: <code>week,start_time,away_team_short_name,home_team_short_name</code>. A header row is optional.</p>
     <form method="post" action="/admin/schedule/preview"><label>Season<input name="season" pattern="[0-9]{4}" required value="${escapeHtml(season)}"></label>
@@ -857,5 +929,6 @@ module.exports = {
   adminAuthentication,
   createAdminRouter,
   parseScheduleCsv,
-  parseBasicAuthorization
+  parseBasicAuthorization,
+  validMessageTemplateFormat
 };

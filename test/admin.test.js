@@ -3,7 +3,7 @@ const http = require('node:http');
 const test = require('node:test');
 const express = require('express');
 
-const { createAdminRouter, parseBasicAuthorization, parseScheduleCsv } = require('../admin');
+const { createAdminRouter, parseBasicAuthorization, parseScheduleCsv, validMessageTemplateFormat } = require('../admin');
 
 function authorization(username, password) {
   return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
@@ -68,6 +68,26 @@ test('schedule CSV requires an explicit timezone', async () => {
   const db = () => ({ select: async () => [{ short_name: 'BUF' }, { short_name: 'NYJ' }] });
   const parsed = await parseScheduleCsv(db, '2026', '1,2026-09-10T20:20:00,BUF,NYJ');
   assert.match(parsed.rows[0].error, /timezone/);
+});
+
+test('message template text preserves every configured dynamic placeholder', () => {
+  const slots = [{ key: 'subject' }, { key: 'adjective' }];
+  assert.equal(
+    validMessageTemplateFormat('{subject}? Very {adjective}!', slots),
+    '{subject}? Very {adjective}!'
+  );
+  assert.throws(
+    () => validMessageTemplateFormat('{subject}?', slots),
+    /Keep each dynamic placeholder exactly once/
+  );
+  assert.throws(
+    () => validMessageTemplateFormat('{subject} and {unknown}', slots),
+    /Keep each dynamic placeholder exactly once/
+  );
+  assert.throws(
+    () => validMessageTemplateFormat('Hello {subject', slots),
+    /must use the form/
+  );
 });
 
 test('admin routes reject missing and incorrect credentials', async () => {

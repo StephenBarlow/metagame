@@ -543,6 +543,10 @@ class PGDB {
     return this.messageTemplatesQuery([templateID], true);
   }
 
+  async invalidateMessageTemplateCache() {
+    await this.invalidateQueries([this.messageTemplatesQuery(null, true)]);
+  }
+
   async getMessageTemplatesByIds(templateIDs) {
     if (!templateIDs.length) return [];
     return this.messageTemplatesQuery(templateIDs, false);
