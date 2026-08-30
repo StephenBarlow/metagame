@@ -1,7 +1,12 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { PGDB } = require('../connection-pool');
+const {
+  PGDB,
+  MAX_LEAGUE_MESSAGES,
+  MESSAGE_RATE_LIMIT_CODE,
+  messageRateLimitError
+} = require('../connection-pool');
 
 const knexConfig = {
   client: 'pg',
@@ -96,7 +101,21 @@ test('message read queries build valid PostgreSQL without executing them', async
   assert.ok(queries.every(({ sql }) => sql.startsWith('select')));
   assert.match(queries[0].sql, /message_template_slot_value_types/);
   assert.match(queries[3].sql, /messages.*week/);
+  assert.match(queries[3].sql, /limit \?/i);
+  assert.equal(queries[3].bindings.at(-1), MAX_LEAGUE_MESSAGES);
   assert.match(queries[4].sql, /message_selections/);
+});
+
+test('message rate limits allow the first three per minute and first thirty per week', () => {
+  assert.equal(messageRateLimitError(2, 29), null);
+
+  const minuteError = messageRateLimitError(3, 3);
+  assert.equal(minuteError.code, MESSAGE_RATE_LIMIT_CODE);
+  assert.match(minuteError.message, /3 messages per minute/);
+
+  const weekError = messageRateLimitError(0, 30);
+  assert.equal(weekError.code, MESSAGE_RATE_LIMIT_CODE);
+  assert.match(weekError.message, /30 messages per league week/);
 });
 
 test('pick cache invalidation deletes each affected query once', async (t) => {

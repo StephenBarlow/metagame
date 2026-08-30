@@ -1,5 +1,6 @@
 const GQL_UNKNOWN_ERROR = 'ERR_UNKNOWN';
 const GQL_INVALID_INPUT = 'ERR_INVALID_INPUT';
+const GQL_RATE_LIMITED = 'ERR_RATE_LIMITED';
 
 const MESSAGE_VALUE_TYPES = {
   CATALOG_VALUE: 'catalog_value',
@@ -16,6 +17,12 @@ async function messageTemplates(parent, args, { dataSources }) {
     const rows = await dataSources.pg.getMessageTemplates();
     return messageTemplatesFromRows(rows);
   } catch (err) {
+    if (err.code === 'MESSAGE_RATE_LIMITED') {
+      return {
+        message: null,
+        errors: [{ code: GQL_RATE_LIMITED, message: err.message }]
+      };
+    }
     console.log(err.stack);
     return [];
   }

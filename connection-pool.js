@@ -5,6 +5,24 @@ const HOUR = 3600;
 const MINUTE = 60;
 const NOTHING = 1;
 const MAX_WEEK = 19;
+const MAX_LEAGUE_MESSAGES = 25;
+const MESSAGE_RATE_LIMIT_CODE = 'MESSAGE_RATE_LIMITED';
+const MESSAGE_RATE_LIMIT_PER_MINUTE = 3;
+const MESSAGE_RATE_LIMIT_PER_WEEK = 30;
+
+function messageRateLimitError(recentCount, weekCount) {
+  let message;
+  if (Number(recentCount) >= MESSAGE_RATE_LIMIT_PER_MINUTE) {
+    message = 'You can submit at most 3 messages per minute. Please wait before posting again.';
+  } else if (Number(weekCount) >= MESSAGE_RATE_LIMIT_PER_WEEK) {
+    message = 'You can submit at most 30 messages per league week.';
+  } else {
+    return null;
+  }
+  const error = new Error(message);
+  error.code = MESSAGE_RATE_LIMIT_CODE;
+  return error;
+}
 
 class PGDB {
   constructor(knexConfig, cache) {
@@ -255,7 +273,8 @@ class PGDB {
         'messages.invalidated_at': null
       })
       .orderBy('messages.created_at', 'desc')
-      .orderBy('messages.id', 'desc');
+      .orderBy('messages.id', 'desc')
+      .limit(MAX_LEAGUE_MESSAGES);
 
     if (week !== null && week !== undefined) query.where('messages.week', week);
     return query;
@@ -668,6 +687,33 @@ class PGDB {
 
   async submitMessage(message, selections) {
     return this.knex.transaction(async trx => {
+      // Serialize submissions by this membership so simultaneous requests
+      // cannot all observe the same pre-insert counts.
+      await trx('memberships')
+        .select('id')
+        .where({ id: message.authorMembershipID })
+        .forUpdate()
+        .first();
+
+      const recent = await trx('messages')
+        .where({
+          author_membership_id: message.authorMembershipID,
+          league_id: message.leagueID
+        })
+        .where('created_at', '>=', trx.raw("CURRENT_TIMESTAMP - INTERVAL '1 minute'"))
+        .count('* as count')
+        .first();
+      const weekly = await trx('messages')
+        .where({
+          author_membership_id: message.authorMembershipID,
+          league_id: message.leagueID,
+          week: message.week
+        })
+        .count('* as count')
+        .first();
+      const rateLimitError = messageRateLimitError(recent.count, weekly.count);
+      if (rateLimitError) throw rateLimitError;
+
       const insertedMessages = await trx('messages')
         .insert({
           league_id: message.leagueID,
@@ -715,3 +761,6 @@ class PGDB {
 }
 
 exports.PGDB = PGDB;
+exports.MAX_LEAGUE_MESSAGES = MAX_LEAGUE_MESSAGES;
+exports.MESSAGE_RATE_LIMIT_CODE = MESSAGE_RATE_LIMIT_CODE;
+exports.messageRateLimitError = messageRateLimitError;
