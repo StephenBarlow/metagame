@@ -13,6 +13,7 @@ function createLoggingPlugin(logger) {
             operationName,
             operationType: operation?.operation ?? null,
             clientIp: responseContext.contextValue?.clientIp ?? null,
+            forwardedFor: responseContext.contextValue?.forwardedFor ?? null,
             durationMs: Date.now() - startedAt,
             errorCount: responseContext.errors?.length ?? 0
           };

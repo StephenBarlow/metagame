@@ -80,7 +80,8 @@ async function start() {
     expressMiddleware(server, {
       context: async ({ req }) => ({
         dataSources: { pg },
-        clientIp: req.ip
+        clientIp: req.ip,
+        forwardedFor: req.get('x-forwarded-for') ?? null
       })
     })
   );
