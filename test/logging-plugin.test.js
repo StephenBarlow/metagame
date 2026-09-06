@@ -3,11 +3,11 @@ const test = require('node:test');
 const { parse } = require('graphql');
 const { createLoggingPlugin } = require('../logging-plugin');
 
-function requestContext(query, clientIp = '203.0.113.10', forwardedFor = '203.0.113.10, 198.51.100.1') {
+function requestContext(query, clientIp = '203.0.113.10') {
   return {
     request: { query },
     operation: parse(query).definitions[0],
-    contextValue: { clientIp, forwardedFor }
+    contextValue: { clientIp }
   };
 }
 
@@ -30,7 +30,6 @@ test('the GraphQL logging plugin warns for anonymous operations and records requ
     operationName: null,
     operationType: 'query',
     clientIp: '203.0.113.10',
-    forwardedFor: '203.0.113.10, 198.51.100.1',
     durationMs: warnings[0].fields.durationMs,
     errorCount: 0
   });

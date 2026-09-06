@@ -25,8 +25,8 @@ ADMIN_PASSWORD='use-a-long-random-password'
 ```
 
 Only use the admin site over HTTPS. Render terminates HTTPS for deployed web
-services. The app trusts Render's one reverse-proxy hop, so request logs use
-the client IP supplied in `X-Forwarded-For`. Admin responses are not cacheable, cross-origin form submissions are
+services. The app trusts the Cloudflare and Render reverse-proxy hops, so
+request logs use the client IP supplied in `X-Forwarded-For`. Admin responses are not cacheable, cross-origin form submissions are
 rejected, and there are no delete actions. Existing games and picks can only be
 modified one at a time. CSV schedule imports preview the parsed games first and
 only add games that are not already present; they never overwrite or delete an

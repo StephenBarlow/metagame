@@ -45,9 +45,9 @@ const loggingPlugin = createLoggingPlugin(console);
 
 async function start() {
   const app = express();
-  // Render sits between this service and public clients. Revisit if the
-  // deployment gains another proxy, such as a CDN.
-  app.set('trust proxy', 1);
+  // Cloudflare and Render sit between this service and public clients.
+  // Revisit if the deployment proxy chain changes.
+  app.set('trust proxy', 2);
   const httpServer = http.createServer(app);
   httpServer.once('close', () => console.info('HTTP server stopped.'));
   const server = new ApolloServer({
@@ -80,8 +80,7 @@ async function start() {
     expressMiddleware(server, {
       context: async ({ req }) => ({
         dataSources: { pg },
-        clientIp: req.ip,
-        forwardedFor: req.get('x-forwarded-for') ?? null
+        clientIp: req.ip
       })
     })
   );
