@@ -14,13 +14,7 @@ const { PGDB } = require('./connection-pool');
 const { createAdminRouter } = require('./admin');
 const { typeDefs } = require('./schema');
 const { resolvers } = require('./resolvers');
-const bunyan = require('bunyan');
-
-// Create a logger instance
-const logger = bunyan.createLogger({
-    name: 'example-app',
-    level: 'info'
-});
+const { createLoggingPlugin } = require('./logging-plugin');
 
 const PORT = process.env.PORT || 4000;
 
@@ -47,48 +41,15 @@ if (process.env.DATABASE_URL) {
   }
 }
 
-const loggingPlugin = {
-  async requestDidStart(requestContext) {
-    logger.info(`Processing started for operation ${requestContext.request.operationName}`);
-    return {
-      async parsingDidStart(requestContext) {
-        return async (err) => {
-          if (err) {
-            logger.error(err);
-          }
-        }
-      },
-      async validationDidStart(requestContext) {
-        // This end hook is unique in that it can receive an array of errors,
-        // which will contain every validation error that occurred.
-        return async (errs) => {
-          if (errs) {
-            errs.forEach(err => logger.error(err));
-          }
-        }
-      },
-      async didEncounterErrors(requestContext) {
-        logger.error(`Error while executing operation ${requestContext.request.operationName}`);
-        logger.error(`Msg: ${requestContext.errors[0].message}`);
-        logger.error(`Query String: ${requestContext.request.query}`);
-      },
-      async executionDidStart(requestContext) {
-        return {
-          async executionDidEnd(err) {
-            logger.info(`Execution completed for operation ${requestContext.request.operationName}`);
-            if (err) {
-              logger.error(err);
-            }
-          }
-        };
-      },
-    };
-  },
-}
+const loggingPlugin = createLoggingPlugin(console);
 
 async function start() {
   const app = express();
+  // Render sits between this service and public clients. Revisit if the
+  // deployment gains another proxy, such as a CDN.
+  app.set('trust proxy', 1);
   const httpServer = http.createServer(app);
+  httpServer.once('close', () => console.info('HTTP server stopped.'));
   const server = new ApolloServer({
     typeDefs,
     resolvers,
@@ -105,29 +66,33 @@ async function start() {
     introspection: true
   });
 
-  logger.info('Starting up server...');
+  console.info('Application starting.');
   const pg = new PGDB(knexConfig, server.cache);
 
   await server.start();
+  console.info('GraphQL server started.');
   app.disable('x-powered-by');
-  app.use('/admin', createAdminRouter({ pg, logger }));
+  app.use('/admin', createAdminRouter({ pg, logger: console }));
   app.use(
     '/',
     cors(),
     express.json(),
     expressMiddleware(server, {
-      context: async () => ({ dataSources: { pg } })
+      context: async ({ req }) => ({
+        dataSources: { pg },
+        clientIp: req.ip
+      })
     })
   );
 
   await new Promise(resolve => httpServer.listen({ port: PORT }, resolve));
-  logger.info(`Server ready at http://localhost:${httpServer.address().port}/`);
+  console.info(`HTTP server listening at http://localhost:${httpServer.address().port}/`);
   return { app, httpServer, pg, server };
 }
 
 if (require.main === module) {
   start().catch(err => {
-    logger.error(err);
+    console.error('Application failed to start.', err);
     process.exitCode = 1;
   });
 }
