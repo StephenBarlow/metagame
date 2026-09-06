@@ -350,7 +350,7 @@
   {
     "key": "TWINSIES",
     "name": "Twinsies",
-    "description": "End any week after week 3 with the same total nonzero score as another player.",
+    "description": "End any week after week 3 with a nonzero total score shared by exactly one other player.",
     "icon_id": null,
     "evaluator": "matchingWeeklyScore",
     "evaluation_phase": "week_finalized",

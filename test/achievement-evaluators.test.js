@@ -113,6 +113,34 @@ test('Go Wide requires picks from uniquely earliest and latest-starting games', 
   assert.equal(evaluateAchievement(achievement, context).length, 0);
 });
 
+test('Twinsies requires exactly two players to share a nonzero cumulative score', () => {
+  const members = [{ user_id: 1 }, { user_id: 2 }, { user_id: 3 }];
+  const scores = new Map([
+    ['1:1', 10], ['2:1', 10], ['3:1', 10],
+    ['1:2', 0], ['2:2', 0], ['3:2', 0],
+    ['1:3', 0], ['2:3', 0], ['3:3', 0],
+    ['1:4', 0], ['2:4', 0], ['3:4', 0]
+  ]);
+  const context = {
+    week: 4,
+    members,
+    getWeekResult: (userID, week) => ({
+      complete: true,
+      isBye: false,
+      score: scores.get(`${userID}:${week}`)
+    })
+  };
+  const achievement = {
+    key: 'TWINSIES',
+    evaluator: 'matchingWeeklyScore',
+    condition_config: { minimum_week: 4, score_must_be_nonzero: true }
+  };
+
+  assert.equal(evaluateAchievement(achievement, context).length, 0);
+  scores.set('3:1', 11);
+  assert.deepEqual(evaluateAchievement(achievement, context).map(match => match.userId), [1, 2]);
+});
+
 test('California Love accepts any distinct pair of 49ers, Rams, and Chargers', () => {
   const context = contextFixture({
     picks: [

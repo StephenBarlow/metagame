@@ -36,7 +36,7 @@ achievement once in each league, but never more than once in the same league.
 | Slow Start | Open the season with a bye. |
 | Leader of the Pack | End any week alone in first place. |
 | Slow Finish | End the season with a bye. |
-| Twinsies | End any week after week 3 with the same total nonzero score as another player. |
+| Twinsies | End any week after week 3 with a nonzero total score shared by exactly one other player. |
 | True Nonconformist | In a single week, pick teams from two games that no other player picks from (week 15 or earlier). |
 | Barely Would've Mattered | Split with your teams winning or losing by a combined margin of 5 or less. (Repeatable) |
 | Road Warriors | Achieve a double win with two away teams. (Repeatable) |

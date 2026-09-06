@@ -597,14 +597,22 @@ function evaluateMatchingWeeklyScore(achievement, context) {
     userId: member.user_id,
     score: cumulativeScore(member.user_id, context.week, context)
   }));
+  const scoreGroups = new Map();
+  for (const row of scores) {
+    const group = scoreGroups.get(row.score) || [];
+    group.push(row);
+    scoreGroups.set(row.score, group);
+  }
   return scores.filter(row =>
     (!config.score_must_be_nonzero || row.score !== 0) &&
-    scores.some(other => other.userId !== row.userId && other.score === row.score)
+    scoreGroups.get(row.score).length === 2
   ).map(row => ({
     userId: row.userId,
     evidence: {
       cumulative_score: row.score,
-      matching_user_ids: scores.filter(other => other.userId !== row.userId && other.score === row.score).map(other => other.userId)
+      matching_user_ids: scoreGroups.get(row.score)
+        .filter(other => other.userId !== row.userId)
+        .map(other => other.userId)
     }
   }));
 }
