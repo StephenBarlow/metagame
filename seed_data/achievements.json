@@ -302,12 +302,12 @@
   {
     "key": "GO_WIDE",
     "name": "Go Wide",
-    "description": "In a single week, pick teams from both a Thursday game and a Monday game.",
+    "description": "In a single week, pick teams from the uniquely earliest and latest-starting games.",
     "icon_id": null,
-    "evaluator": "gameTagCombination",
+    "evaluator": "firstAndLastGame",
     "evaluation_phase": "pick_locked",
     "scope": "player_week",
-    "condition_config": { "required_tags": ["thursday", "monday"], "one_pick_per_tag": true },
+    "condition_config": {},
     "repeatable": false,
     "active": true
   },

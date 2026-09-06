@@ -32,7 +32,7 @@ achievement once in each league, but never more than once in the same league.
 | The Cheese Stands Alone | Be the only player to pick the Packers in a given week. |
 | Pickmas | Pick two teams from games on December 24th and/or 25th. |
 | Picksgiving | Pick two teams from games on Thanksgiving. |
-| Go Wide | In a single week, pick teams from both a Thursday game and a Monday game. |
+| Go Wide | In a single week, pick teams from the uniquely earliest and latest-starting games. |
 | Slow Start | Open the season with a bye. |
 | Leader of the Pack | End any week alone in first place. |
 | Slow Finish | End the season with a bye. |

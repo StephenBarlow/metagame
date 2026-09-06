@@ -79,6 +79,40 @@ test('teamCombination supports choosing any two distinct teams from an option se
   assert.equal(matches.length, 1);
 });
 
+test('Go Wide requires picks from uniquely earliest and latest-starting games', () => {
+  const context = contextFixture({
+    picks: [
+      { id: 1, user_id: 10, team_id: 1, week: 1, invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 5, week: 1, invalidated_at: null }
+    ],
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' },
+      { id: 3, short_name: 'C', sports_league: 'NFL' },
+      { id: 4, short_name: 'D', sports_league: 'NFL' },
+      { id: 5, short_name: 'E', sports_league: 'NFL' },
+      { id: 6, short_name: 'F', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, start_time: '2026-09-10T00:00:00Z', away_team_short_name: 'A', home_team_short_name: 'B' },
+      { id: 2, week: 1, start_time: '2026-09-13T17:00:00Z', away_team_short_name: 'C', home_team_short_name: 'D' },
+      { id: 3, week: 1, start_time: '2026-09-16T00:00:00Z', away_team_short_name: 'E', home_team_short_name: 'F' }
+    ]
+  });
+  const achievement = { key: 'GO_WIDE', evaluator: 'firstAndLastGame', condition_config: {} };
+
+  assert.equal(evaluateAchievement(achievement, context).length, 1);
+
+  context.gamesByWeek.get(1).push({
+    id: 4,
+    week: 1,
+    start_time: '2026-09-10T00:00:00Z',
+    away_team_short_name: 'G',
+    home_team_short_name: 'H'
+  });
+  assert.equal(evaluateAchievement(achievement, context).length, 0);
+});
+
 test('California Love accepts any distinct pair of 49ers, Rams, and Chargers', () => {
   const context = contextFixture({
     picks: [

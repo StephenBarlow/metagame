@@ -111,6 +111,41 @@ function evaluateGameTagCombination(achievement, context) {
   );
 }
 
+function evaluateFirstAndLastGame(achievement, context) {
+  const games = context.gamesByWeek.get(context.week) || [];
+  const gamesWithStartTimes = games.map(game => ({
+    game,
+    startTime: new Date(game.start_time).getTime()
+  }));
+  if (gamesWithStartTimes.length < 2 || gamesWithStartTimes.some(({ startTime }) => !Number.isFinite(startTime))) {
+    return [];
+  }
+
+  const earliestStartTime = Math.min(...gamesWithStartTimes.map(({ startTime }) => startTime));
+  const latestStartTime = Math.max(...gamesWithStartTimes.map(({ startTime }) => startTime));
+  const earliestGames = gamesWithStartTimes.filter(({ startTime }) => startTime === earliestStartTime);
+  const latestGames = gamesWithStartTimes.filter(({ startTime }) => startTime === latestStartTime);
+  if (earliestGames.length !== 1 || latestGames.length !== 1) return [];
+
+  const firstGame = earliestGames[0].game;
+  const lastGame = latestGames[0].game;
+  return playerWeekCandidates(
+    context,
+    userId => {
+      const weekPick = context.getWeekPick(userId, context.week);
+      if (weekPick.picks.length !== 2 || weekPick.isBye) return false;
+      const pickedGameIDs = new Set(weekPick.games.filter(Boolean).map(game => String(game.id)));
+      return pickedGameIDs.has(String(firstGame.id)) && pickedGameIDs.has(String(lastGame.id));
+    },
+    userId => pickEvidence(context.getWeekPick(userId, context.week), {
+      first_game_id: firstGame.id,
+      first_game_start_time: firstGame.start_time,
+      last_game_id: lastGame.id,
+      last_game_start_time: lastGame.start_time
+    })
+  );
+}
+
 function evaluateSeasonalThreshold(achievement, context) {
   const config = achievement.condition_config;
   const matcher = config.base_evaluator === 'teamCombination'
@@ -635,6 +670,7 @@ function evaluateFinalWeekPickPattern(achievement, context) {
 const evaluatorRegistry = {
   teamCombination: evaluateTeamCombination,
   gameTagCombination: evaluateGameTagCombination,
+  firstAndLastGame: evaluateFirstAndLastGame,
   seasonalThreshold: evaluateSeasonalThreshold,
   consecutivePickPattern: evaluateConsecutivePickPattern,
   weekPickPattern: evaluateWeekPickPattern,
