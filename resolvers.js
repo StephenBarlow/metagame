@@ -1,6 +1,7 @@
 const emailValidator = require('email-validator');
 const { assertDirective } = require('graphql');
 const messageResolvers = require('./messages');
+const { startAchievementEvaluationJob } = require('./render-one-off-jobs');
 
 const PG_UNIQUE_VIOLATION = '23505';
 const GQL_UNKNOWN_ERROR = 'ERR_UNKNOWN'
@@ -21,8 +22,16 @@ const resolvers = {
       }
     },
     async league(parent, { leagueID }, context, info) {
-      let [league, users, teams, awards] = await Promise.all([
-        context.dataSources.pg.getLeagueById(leagueID),
+      let league = await context.dataSources.pg.getLeagueById(leagueID);
+      if (typeof context.dataSources.pg.revealLeagueIfDue === 'function') {
+        const reveal = await context.dataSources.pg.revealLeagueIfDue(league, process.env.CURRENT_SEASON);
+        league = reveal.league;
+        if (reveal.revealed) {
+          queuePickLockedEvaluation(leagueID, reveal.week);
+        }
+      }
+
+      const [users, teams, awards] = await Promise.all([
         context.dataSources.pg.getLeagueMembers(leagueID),
         context.dataSources.pg.getTeams(),
         context.dataSources.pg.getAchievementAwardsForLeague(leagueID)
@@ -606,6 +615,12 @@ function effectiveLeagueWeek(league, column, environmentVariable, fallback) {
   return Number.isInteger(environmentWeek) ? environmentWeek : fallback;
 }
 
+function queuePickLockedEvaluation(leagueID, week) {
+  Promise.resolve()
+    .then(() => startAchievementEvaluationJob('pick-locked', Number(leagueID), Number(week)))
+    .catch(error => console.error(`Failed to start pick-locked achievement evaluation for league ${leagueID}, week ${week}:`, error));
+}
+
 function teamFromRow(row) {
   return {
     id: row.id,
@@ -641,3 +656,4 @@ function gamesFromRows(rows, allTeams) {
 
 exports.resolvers = resolvers;
 exports.effectiveLeagueWeek = effectiveLeagueWeek;
+exports.queuePickLockedEvaluation = queuePickLockedEvaluation;

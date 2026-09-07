@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const knex = require('knex');
+const { sundayOnePmEasternRevealAt } = require('./reveal-schedule');
 
 const HOUR = 3600;
 const MINUTE = 60;
@@ -515,6 +516,55 @@ class PGDB {
     if (val.length) {
       return val[0];
     }
+  }
+
+  async revealLeagueIfDue(league, currentSeason) {
+    const currentWeek = Number(league?.current_week);
+    const revealedWeek = Number(league?.revealed_week);
+    const usesExplicitWeeks = league?.current_week !== null && league?.current_week !== undefined &&
+      league?.revealed_week !== null && league?.revealed_week !== undefined;
+    const isActiveNflLeague = league?.sports_league === 'NFL' &&
+      currentSeason && String(league.season) === String(currentSeason);
+    if (!usesExplicitWeeks || !isActiveNflLeague ||
+        !Number.isInteger(currentWeek) || !Number.isInteger(revealedWeek) ||
+        revealedWeek >= currentWeek) {
+      return { league, revealed: false };
+    }
+
+    const games = await this.getSportsGamesForWeek(league.season, currentWeek);
+    const revealAt = sundayOnePmEasternRevealAt(games);
+    if (!revealAt) return { league, revealed: false };
+
+    const updated = await this.knex('fantasy_leagues')
+      .where({
+        id: league.id,
+        season: league.season,
+        sports_league: 'NFL',
+        current_week: currentWeek,
+        revealed_week: revealedWeek
+      })
+      .whereRaw('revealed_week < current_week')
+      .whereRaw('CURRENT_TIMESTAMP >= ?', [revealAt])
+      .update({ revealed_week: this.knex.ref('current_week') })
+      .returning('*');
+
+    if (!updated.length) {
+      const currentLeague = await this.knex('fantasy_leagues')
+        .select('*')
+        .where({ id: league.id })
+        .first();
+      return { league: currentLeague || league, revealed: false };
+    }
+
+    const revealedLeague = updated[0];
+    await this.invalidateLeagueCache(revealedLeague.id);
+    await this.invalidateLeaguePicksCache(revealedLeague.id);
+    return {
+      league: revealedLeague,
+      revealed: true,
+      week: currentWeek,
+      revealAt
+    };
   }
 
   async getTeam(shortName, league) {
