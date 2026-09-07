@@ -708,6 +708,18 @@
     "active": true
   },
   {
+    "key": "GREAT_MINDS",
+    "name": "Great Minds",
+    "description": "Be one of exactly two players to make the same scoring pick in a week.",
+    "icon_id": null,
+    "evaluator": "matchingPickGroup",
+    "evaluation_phase": "week_finalized",
+    "scope": "league_week",
+    "condition_config": { "player_count_exact": 2, "qualifying_outcomes": ["double_win", "double_loss"] },
+    "repeatable": false,
+    "active": true
+  },
+  {
     "key": "SILVER_LINING",
     "name": "Silver Lining",
     "description": "Achieve a double-loss with your favorite team.",

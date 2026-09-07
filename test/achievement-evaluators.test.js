@@ -471,6 +471,46 @@ test('Sheep awards each player sharing the same active non-BYE pair with five ot
   assert.equal(matches[0].evidence.matching_player_count, 6);
 });
 
+test('Great Minds requires exactly two players with the same scoring pick', () => {
+  const members = Array.from({ length: 7 }, (_, index) => ({ user_id: index + 1 }));
+  const pairForUser = new Map([
+    [1, [1, 2]], [2, [1, 2]], // double win: qualifies
+    [3, [3, 4]], [4, [3, 4]], // split: does not qualify
+    [5, [5, 6]], [6, [5, 6]], [7, [5, 6]] // three players: does not qualify
+  ]);
+  const picks = members.flatMap(member => pairForUser.get(member.user_id).map((team_id, index) => ({
+    id: member.user_id * 10 + index,
+    user_id: member.user_id,
+    team_id,
+    week: 1,
+    invalidated_at: null
+  })));
+  const context = contextFixture({
+    members,
+    teams: [1, 2, 3, 4, 5, 6].map(id => ({ id, short_name: String.fromCharCode(64 + id), sports_league: 'NFL' })),
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'X', away_team_score: 20, home_team_score: 10 },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'Y', away_team_score: 21, home_team_score: 10 },
+      { id: 3, week: 1, away_team_short_name: 'C', home_team_short_name: 'Z', away_team_score: 10, home_team_score: 20 },
+      { id: 4, week: 1, away_team_short_name: 'D', home_team_short_name: 'Q', away_team_score: 20, home_team_score: 10 },
+      { id: 5, week: 1, away_team_short_name: 'E', home_team_short_name: 'R', away_team_score: 20, home_team_score: 10 },
+      { id: 6, week: 1, away_team_short_name: 'F', home_team_short_name: 'S', away_team_score: 20, home_team_score: 10 }
+    ],
+    picks
+  });
+
+  const matches = evaluateAchievement({
+    key: 'GREAT_MINDS',
+    evaluator: 'matchingPickGroup',
+    condition_config: { player_count_exact: 2, qualifying_outcomes: ['double_win', 'double_loss'] }
+  }, context);
+
+  assert.deepEqual(matches.map(match => match.userId), [1, 2]);
+  assert.equal(matches[0].evidence.outcome, 'double_win');
+  assert.equal(matches[0].evidence.score, 21);
+  assert.deepEqual(matches[0].evidence.matching_user_ids, [2]);
+});
+
 test('maximum possible score considers all teams, not only player availability', () => {
   const context = contextFixture({
     games: [

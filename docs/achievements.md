@@ -53,6 +53,7 @@ achievement once in each league, but never more than once in the same league.
 | Buzzer Beater | Submit a pick within 5 minutes of one of your teams starting their game. |
 | Slim Pickings | Submit a pick when fewer than five games remain available to pick from. |
 | Sheep | Submit the exact same non-BYE picks as at least five other players. |
+| Great Minds | Be one of exactly two players to make the same scoring pick in a week. |
 | Opposition Research | Pick the opponent of any single team at least five times. |
 | Brady Bunch | Pick the Patriots and Bucs in the same week. |
 | Six Sevennn! | Pick a double-win with one team winning by six and the other by seven. (Repeatable) |

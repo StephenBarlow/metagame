@@ -353,7 +353,9 @@ function evaluateLimitedGameAvailability(achievement, context) {
 }
 
 function evaluateMatchingPickGroup(achievement, context) {
-  const minimumOthers = achievement.condition_config.other_player_count_at_least;
+  const config = achievement.condition_config;
+  const minimumOthers = config.other_player_count_at_least;
+  const exactPlayerCount = config.player_count_exact;
   const groups = new Map();
   for (const member of context.members) {
     const weekPick = context.getWeekPick(member.user_id, context.week);
@@ -366,13 +368,25 @@ function evaluateMatchingPickGroup(achievement, context) {
   }
 
   return [...groups.values()]
-    .filter(group => group.userIds.length >= minimumOthers + 1)
+    .filter(group => {
+      if (exactPlayerCount !== undefined && group.userIds.length !== exactPlayerCount) return false;
+      if (minimumOthers !== undefined && group.userIds.length < minimumOthers + 1) return false;
+      if (!config.qualifying_outcomes) return true;
+      const result = context.getWeekResult(group.userIds[0], context.week);
+      return result.complete && config.qualifying_outcomes.includes(result.outcome);
+    })
     .flatMap(group => group.userIds.map(userId => ({
       userId,
       evidence: pickEvidence(context.getWeekPick(userId, context.week), {
         matching_user_ids: group.userIds.filter(otherUserId => String(otherUserId) !== String(userId)),
         matching_player_count: group.userIds.length,
-        other_player_count_at_least: minimumOthers
+        ...(minimumOthers === undefined ? {} : { other_player_count_at_least: minimumOthers }),
+        ...(exactPlayerCount === undefined ? {} : { player_count_exact: exactPlayerCount }),
+        ...(config.qualifying_outcomes ? {
+          qualifying_outcomes: config.qualifying_outcomes,
+          outcome: context.getWeekResult(userId, context.week).outcome,
+          score: context.getWeekResult(userId, context.week).score
+        } : {})
       })
     })));
 }
