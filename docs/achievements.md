@@ -45,6 +45,7 @@ achievement once in each league, but never more than once in the same league.
 | Best Week Ever | Achieve a double-win with your favorite team. |
 | Et Tu? | Achieve a double-win by picking the opponent of your favorite team. |
 | Alignment of Interests | Achieve a double-loss by picking the opponent of your favorite team. |
+| Lone Holdout | Be the only player who hasn't picked a particular team yet this season. |
 | Worst of All Worlds | Split when picking your favorite team because they lost. |
 | Bittersweet Split | Split when picking your favorite team because they won. |
 | Absolute Drubbing | Score with one of your picked games ending in a shutout. (Repeatable) |

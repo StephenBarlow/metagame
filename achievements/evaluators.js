@@ -619,6 +619,51 @@ function evaluateFavoriteTeamOpponentResult(achievement, context) {
   );
 }
 
+function pickedTeamIdsThroughWeek(userId, context) {
+  const teamIds = new Set();
+  for (let week = 1; week <= context.week; week += 1) {
+    for (const pick of context.getWeekPick(userId, week).picks) {
+      if (Number(pick.team_id) !== -1) teamIds.add(String(pick.team_id));
+    }
+  }
+  return teamIds;
+}
+
+function evaluateSoleUnpickedTeam(achievement, context) {
+  if (context.members.length < 2) return [];
+
+  const pickedTeamsByUser = new Map(context.members.map(member => [
+    String(member.user_id),
+    pickedTeamIdsThroughWeek(member.user_id, context)
+  ]));
+  const holdoutTeamsByUser = new Map(context.members.map(member => [String(member.user_id), []]));
+
+  for (const team of context.teams) {
+    const pickers = context.members.filter(member =>
+      pickedTeamsByUser.get(String(member.user_id)).has(String(team.id))
+    );
+    if (pickers.length !== context.members.length - 1) continue;
+    const holdout = context.members.find(member =>
+      !pickedTeamsByUser.get(String(member.user_id)).has(String(team.id))
+    );
+    if (holdout) holdoutTeamsByUser.get(String(holdout.user_id)).push(team);
+  }
+
+  return context.members.flatMap(member => {
+    const holdoutTeams = holdoutTeamsByUser.get(String(member.user_id));
+    if (!holdoutTeams.length) return [];
+    return [{
+      userId: member.user_id,
+      evidence: {
+        holdout_team_ids: holdoutTeams.map(team => team.id),
+        holdout_team_short_names: holdoutTeams.map(team => team.short_name),
+        active_member_count: context.members.length,
+        evaluated_through_week: context.week
+      }
+    }];
+  });
+}
+
 function evaluateMatchingFinalScores(achievement, context) {
   return completedResultCandidates(achievement, context, (result, weekPick) => {
     if (weekPick.games[0].id === weekPick.games[1].id) return false;
@@ -756,6 +801,7 @@ const evaluatorRegistry = {
   venueAndResult: evaluateVenueAndResult,
   favoriteTeamResult: evaluateFavoriteTeamResult,
   favoriteTeamOpponentResult: evaluateFavoriteTeamOpponentResult,
+  soleUnpickedTeam: evaluateSoleUnpickedTeam,
   matchingFinalScores: evaluateMatchingFinalScores,
   overallStanding: evaluateOverallStanding,
   matchingWeeklyScore: evaluateMatchingWeeklyScore,

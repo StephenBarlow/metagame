@@ -357,6 +357,38 @@ test('favorite-team opponent achievements require a scoring pick against the fav
   assert.equal(alignment[0].evidence.favorite_team_margin, 11);
 });
 
+test('Lone Holdout requires every other active member to have picked a team', () => {
+  const context = contextFixture({
+    members: [{ user_id: 1 }, { user_id: 2 }, { user_id: 3 }],
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' },
+      { id: 3, short_name: 'C', sports_league: 'NFL' }
+    ],
+    picks: [
+      { id: 1, user_id: 1, team_id: 1, week: 1, invalidated_at: '2026-09-01T00:00:00Z' },
+      { id: 2, user_id: 1, team_id: 2, week: 1, invalidated_at: null },
+      { id: 3, user_id: 1, team_id: 3, week: 1, invalidated_at: null },
+      { id: 4, user_id: 2, team_id: 1, week: 1, invalidated_at: null },
+      { id: 5, user_id: 2, team_id: 2, week: 1, invalidated_at: null },
+      { id: 6, user_id: 3, team_id: 1, week: 1, invalidated_at: null },
+      { id: 7, user_id: 3, team_id: 3, week: 1, invalidated_at: null }
+    ]
+  });
+
+  const matches = evaluateAchievement({
+    key: 'LONE_HOLDOUT',
+    evaluator: 'soleUnpickedTeam',
+    condition_config: {}
+  }, context);
+
+  assert.deepEqual(matches.map(match => match.userId), [1, 2, 3]);
+  assert.deepEqual(matches[0].evidence.holdout_team_ids, [1]);
+  assert.deepEqual(matches[0].evidence.holdout_team_short_names, ['A']);
+  assert.deepEqual(matches[1].evidence.holdout_team_ids, [3]);
+  assert.deepEqual(matches[2].evidence.holdout_team_ids, [2]);
+});
+
 test('Worst of All Worlds requires the favorite team to be the losing side of a split', () => {
   const context = contextFixture({
     members: [{ user_id: 10, display_name: 'Favorite set', favorite_team_id: 1 }],

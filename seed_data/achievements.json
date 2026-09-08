@@ -768,6 +768,18 @@
     "active": true
   },
   {
+    "key": "LONE_HOLDOUT",
+    "name": "Lone Holdout",
+    "description": "Be the only player who hasn't picked a particular team yet this season.",
+    "icon_id": null,
+    "evaluator": "soleUnpickedTeam",
+    "evaluation_phase": "week_finalized",
+    "scope": "league_week",
+    "condition_config": {},
+    "repeatable": false,
+    "active": true
+  },
+  {
     "key": "WORST_OF_ALL_WORLDS",
     "name": "Worst of All Worlds",
     "description": "Split when picking your favorite team because they lost.",
