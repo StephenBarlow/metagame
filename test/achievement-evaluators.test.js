@@ -308,6 +308,55 @@ test('favorite-team result achievements require the favorite team and the config
   assert.equal(silverLining.length, 0);
 });
 
+test('favorite-team opponent achievements require a scoring pick against the favorite team', () => {
+  const context = contextFixture({
+    members: [
+      { user_id: 10, favorite_team_id: 1 },
+      { user_id: 11, favorite_team_id: 4 },
+      { user_id: 12, favorite_team_id: 1 }
+    ],
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' },
+      { id: 3, short_name: 'C', sports_league: 'NFL' },
+      { id: 4, short_name: 'D', sports_league: 'NFL' },
+      { id: 5, short_name: 'E', sports_league: 'NFL' },
+      { id: 6, short_name: 'F', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'C', away_team_score: 14, home_team_score: 21 },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'X', away_team_score: 20, home_team_score: 10 },
+      { id: 3, week: 1, away_team_short_name: 'D', home_team_short_name: 'F', away_team_score: 21, home_team_score: 10 },
+      { id: 4, week: 1, away_team_short_name: 'E', home_team_short_name: 'Y', away_team_score: 10, home_team_score: 20 }
+    ],
+    picks: [
+      { id: 1, user_id: 10, team_id: 3, week: 1, invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 2, week: 1, invalidated_at: null },
+      { id: 3, user_id: 11, team_id: 6, week: 1, invalidated_at: null },
+      { id: 4, user_id: 11, team_id: 5, week: 1, invalidated_at: null },
+      { id: 5, user_id: 12, team_id: 1, week: 1, invalidated_at: null },
+      { id: 6, user_id: 12, team_id: 2, week: 1, invalidated_at: null }
+    ]
+  });
+
+  const etTu = evaluateAchievement({
+    key: 'ET_TU',
+    evaluator: 'favoriteTeamOpponentResult',
+    condition_config: { result: 'double_win' }
+  }, context);
+  const alignment = evaluateAchievement({
+    key: 'ALIGNMENT_OF_INTERESTS',
+    evaluator: 'favoriteTeamOpponentResult',
+    condition_config: { result: 'double_loss' }
+  }, context);
+
+  assert.deepEqual(etTu.map(match => match.userId), [10]);
+  assert.equal(etTu[0].evidence.favorite_team_short_name, 'A');
+  assert.equal(etTu[0].evidence.picked_opponent_team_short_name, 'C');
+  assert.deepEqual(alignment.map(match => match.userId), [11]);
+  assert.equal(alignment[0].evidence.favorite_team_margin, 11);
+});
+
 test('Worst of All Worlds requires the favorite team to be the losing side of a split', () => {
   const context = contextFixture({
     members: [{ user_id: 10, display_name: 'Favorite set', favorite_team_id: 1 }],

@@ -574,6 +574,51 @@ function evaluateFavoriteTeamResult(achievement, context) {
   );
 }
 
+function favoriteTeamOpponentPick(userId, context) {
+  const member = context.members.find(row => String(row.user_id) === String(userId));
+  if (member?.favorite_team_id === null || member?.favorite_team_id === undefined) return null;
+
+  const favoriteTeam = context.teamsById.get(String(member.favorite_team_id));
+  const weekPick = context.getWeekPick(userId, context.week);
+  if (!favoriteTeam || weekPick.isBye) return null;
+  const opponentPickIndex = weekPick.teams.findIndex((team, index) => {
+    const game = weekPick.games[index];
+    return team?.short_name !== favoriteTeam.short_name &&
+      (game?.away_team_short_name === favoriteTeam.short_name ||
+        game?.home_team_short_name === favoriteTeam.short_name);
+  });
+  if (opponentPickIndex < 0) return null;
+  return { member, favoriteTeam, weekPick, opponentPickIndex };
+}
+
+function evaluateFavoriteTeamOpponentResult(achievement, context) {
+  const config = achievement.condition_config;
+  return playerWeekCandidates(
+    context,
+    userId => {
+      const opponentPick = favoriteTeamOpponentPick(userId, context);
+      const result = context.getWeekResult(userId, context.week);
+      return Boolean(opponentPick) && result.complete && !result.isBye && result.outcome === config.result;
+    },
+    userId => {
+      const opponentPick = favoriteTeamOpponentPick(userId, context);
+      const result = context.getWeekResult(userId, context.week);
+      const pickedOpponent = opponentPick.weekPick.teams[opponentPick.opponentPickIndex];
+      return pickEvidence(opponentPick.weekPick, {
+        favorite_team_id: opponentPick.member.favorite_team_id,
+        favorite_team_short_name: opponentPick.favoriteTeam.short_name,
+        picked_opponent_team_id: pickedOpponent.id,
+        picked_opponent_team_short_name: pickedOpponent.short_name,
+        picked_opponent_margin: result.margins[opponentPick.opponentPickIndex],
+        favorite_team_margin: -result.margins[opponentPick.opponentPickIndex],
+        outcome: result.outcome,
+        score: result.score,
+        margins: result.margins
+      });
+    }
+  );
+}
+
 function evaluateMatchingFinalScores(achievement, context) {
   return completedResultCandidates(achievement, context, (result, weekPick) => {
     if (weekPick.games[0].id === weekPick.games[1].id) return false;
@@ -710,6 +755,7 @@ const evaluatorRegistry = {
   weeklyScore: evaluateWeeklyScore,
   venueAndResult: evaluateVenueAndResult,
   favoriteTeamResult: evaluateFavoriteTeamResult,
+  favoriteTeamOpponentResult: evaluateFavoriteTeamOpponentResult,
   matchingFinalScores: evaluateMatchingFinalScores,
   overallStanding: evaluateOverallStanding,
   matchingWeeklyScore: evaluateMatchingWeeklyScore,

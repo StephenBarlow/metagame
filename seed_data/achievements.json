@@ -744,6 +744,30 @@
     "active": true
   },
   {
+    "key": "ET_TU",
+    "name": "Et Tu?",
+    "description": "Achieve a double-win by picking the opponent of your favorite team.",
+    "icon_id": null,
+    "evaluator": "favoriteTeamOpponentResult",
+    "evaluation_phase": "week_finalized",
+    "scope": "player_week",
+    "condition_config": { "result": "double_win" },
+    "repeatable": false,
+    "active": true
+  },
+  {
+    "key": "ALIGNMENT_OF_INTERESTS",
+    "name": "Alignment of Interests",
+    "description": "Achieve a double-loss by picking the opponent of your favorite team.",
+    "icon_id": null,
+    "evaluator": "favoriteTeamOpponentResult",
+    "evaluation_phase": "week_finalized",
+    "scope": "player_week",
+    "condition_config": { "result": "double_loss" },
+    "repeatable": false,
+    "active": true
+  },
+  {
     "key": "WORST_OF_ALL_WORLDS",
     "name": "Worst of All Worlds",
     "description": "Split when picking your favorite team because they lost.",
