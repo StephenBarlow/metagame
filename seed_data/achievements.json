@@ -278,24 +278,24 @@
   {
     "key": "PICKMAS",
     "name": "Pickmas",
-    "description": "Pick two teams from games on December 24th and/or 25th.",
+    "description": "Pick at least one team from a game on December 24th and/or 25th.",
     "icon_id": null,
     "evaluator": "gameTagCombination",
     "evaluation_phase": "pick_locked",
     "scope": "player_week",
-    "condition_config": { "tag": "christmas", "picked_team_count": 2 },
+    "condition_config": { "tag": "christmas", "picked_team_count": 1 },
     "repeatable": false,
     "active": true
   },
   {
     "key": "PICKSGIVING",
     "name": "Picksgiving",
-    "description": "Pick two teams from games on Thanksgiving.",
+    "description": "Pick at least one team from a game on Thanksgiving.",
     "icon_id": null,
     "evaluator": "gameTagCombination",
     "evaluation_phase": "pick_locked",
     "scope": "player_week",
-    "condition_config": { "tag": "thanksgiving", "picked_team_count": 2 },
+    "condition_config": { "tag": "thanksgiving", "picked_team_count": 1 },
     "repeatable": false,
     "active": true
   },

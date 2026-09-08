@@ -30,8 +30,8 @@ achievement once in each league, but never more than once in the same league.
 | Gold Rush | Pick the 49ers and Saints in the same week. |
 | Heated Rivalry | Pick two teams from the same division in the same week. |
 | The Cheese Stands Alone | Be the only player to pick the Packers in a given week. |
-| Pickmas | Pick two teams from games on December 24th and/or 25th. |
-| Picksgiving | Pick two teams from games on Thanksgiving. |
+| Pickmas | Pick at least one team from a game on December 24th and/or 25th. |
+| Picksgiving | Pick at least one team from a game on Thanksgiving. |
 | Go Wide | In a single week, pick teams from the uniquely earliest and latest-starting games. |
 | Slow Start | Open the season with a bye. |
 | Leader of the Pack | End any week alone in first place. |

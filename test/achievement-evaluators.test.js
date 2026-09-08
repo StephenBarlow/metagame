@@ -79,6 +79,33 @@ test('teamCombination supports choosing any two distinct teams from an option se
   assert.equal(matches.length, 1);
 });
 
+test('Pickmas and Picksgiving qualify when either selected game has the holiday tag', () => {
+  const context = contextFixture({
+    picks: [
+      { id: 1, user_id: 10, team_id: 1, week: 1, invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 2, week: 1, invalidated_at: null }
+    ],
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'X' },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'Y' }
+    ],
+    gameTags: [{ game_id: 1, tag: 'christmas' }, { game_id: 1, tag: 'thanksgiving' }]
+  });
+
+  for (const [key, tag] of [['PICKMAS', 'christmas'], ['PICKSGIVING', 'thanksgiving']]) {
+    const matches = evaluateAchievement({
+      key,
+      evaluator: 'gameTagCombination',
+      condition_config: { tag, picked_team_count: 1 }
+    }, context);
+    assert.deepEqual(matches.map(match => match.userId), [10]);
+  }
+});
+
 test('Go Wide requires picks from uniquely earliest and latest-starting games', () => {
   const context = contextFixture({
     picks: [
