@@ -671,15 +671,24 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
 
   router.get('/leagues/:id', async (req, res) => {
     const leagueID = requiredInteger(req.params.id, 'League ID');
-    const [league, members, users] = await Promise.all([
+    const [league, members, users, teams] = await Promise.all([
       db('fantasy_leagues').where({ id: leagueID }).first(),
       activeMembersQuery(db, leagueID),
-      db('users').select('*').orderBy('email')
+      db('users').select('*').orderBy('email'),
+      db('teams').select('*').orderBy('short_name')
     ]);
     if (!league) return res.status(404).send(page('League not found', '<p>No league has that ID.</p>'));
     const memberIDs = new Set(members.map(member => String(member.user_id)));
     const availableUsers = users.filter(user => !memberIDs.has(String(user.id)));
-    const rows = members.map(member => `<tr><td>${escapeHtml(member.display_name)}</td><td>${escapeHtml(member.email)}</td><td>${escapeHtml(formatTimestamp(member.created_at))}</td></tr>`).join('');
+    const rows = members.map(member => `<tr>
+      <td>${escapeHtml(member.email)}</td>
+      <td colspan="2"><form class="form-grid" method="post" action="/admin/leagues/${leagueID}/members/${member.user_id}">
+        <label>Display name<input name="display_name" required maxlength="255" value="${escapeHtml(member.display_name)}"></label>
+        <label>Favorite team<select name="favorite_team_id"><option value="">No favorite team</option>${teams.map(team => option(team.id, `${team.short_name} — ${team.name}`, member.favorite_team_id)).join('')}</select></label>
+        <button type="submit">Save member</button>
+      </form></td>
+      <td>${escapeHtml(formatTimestamp(member.created_at))}</td>
+    </tr>`).join('');
     const addForm = isConcluded(league)
       ? '<p class="warning">This league is concluded; new members cannot be added.</p>'
       : `<form class="form-grid" method="post" action="/admin/leagues/${leagueID}/members">
@@ -695,7 +704,7 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
         </form>
       </div>
       <div class="panel"><h2>Add an existing user</h2>${addForm}</div>
-      <div class="table-wrap"><table><thead><tr><th>Display name</th><th>Email</th><th>Joined</th></tr></thead><tbody>${rows || '<tr><td colspan="3">No members.</td></tr>'}</tbody></table></div>`;
+      <div class="table-wrap"><table><thead><tr><th>Email</th><th colspan="2">Membership</th><th>Joined</th></tr></thead><tbody>${rows || '<tr><td colspan="4">No members.</td></tr>'}</tbody></table></div>`;
     res.send(page('League members', content, req.query.notice, req.query.notice_type));
   });
 
@@ -756,6 +765,33 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     await db('memberships').insert({ user_id: userID, league_id: leagueID, display_name: displayName });
     await pg.invalidateMembershipCache(userID, leagueID, league.owner_id);
     redirectWithNotice(res, `/admin/leagues/${leagueID}`, 'Member added.');
+  });
+
+  router.post('/leagues/:id/members/:userID', async (req, res) => {
+    const leagueID = requiredInteger(req.params.id, 'League ID');
+    const userID = requiredInteger(req.params.userID, 'User ID');
+    const displayName = String(req.body.display_name ?? '').trim();
+    if (!displayName) throw new AdminInputError('Display name is required.');
+    if (displayName.length > 255) throw new AdminInputError('Display name must be 255 characters or fewer.');
+
+    const favoriteTeamID = req.body.favorite_team_id === '' || req.body.favorite_team_id === undefined
+      ? null
+      : requiredInteger(req.body.favorite_team_id, 'Favorite team ID');
+    const [league, membership, team] = await Promise.all([
+      db('fantasy_leagues').where({ id: leagueID }).first(),
+      activeMembersQuery(db, leagueID).where('memberships.user_id', userID).first(),
+      favoriteTeamID === null ? null : db('teams').where({ id: favoriteTeamID }).first()
+    ]);
+    if (!league) throw new AdminInputError('League not found.');
+    if (!membership) throw new AdminInputError('That user is not an active member of the league.');
+    if (favoriteTeamID !== null && !team) throw new AdminInputError('Favorite team not found.');
+
+    await db('memberships').where({ id: membership.id }).update({
+      display_name: displayName,
+      favorite_team_id: favoriteTeamID
+    });
+    await pg.invalidateMembershipCache(userID, leagueID, league.owner_id);
+    redirectWithNotice(res, `/admin/leagues/${leagueID}`, 'Member updated.');
   });
 
   router.get('/users', async (req, res) => {
