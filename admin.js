@@ -440,6 +440,8 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
       <td>${pick.invalidated_at ? '' : `<form method="post" action="/admin/picks/${pick.id}/invalidate" onsubmit="return confirm('Invalidate this pick?')">
         <input type="hidden" name="return_to" value="/admin/picks?league_id=${leagueID}&week=${week}"><button class="danger" type="submit">Invalidate</button></form>`}</td>
     </tr>`).join('');
+    const membersWithoutCurrentPick = activeMembersWithoutCurrentPick(members, picks);
+    const missingPickRows = membersWithoutCurrentPick.map(member => `<li>${escapeHtml(member.display_name || member.email)}</li>`).join('');
 
     const memberOptions = members.map(member => option(member.user_id, `${member.display_name} (${member.email})`)).join('');
     const teamOptions = option(-1, 'BYE') + teams.map(team => option(team.id, `${team.name} (${team.short_name})`)).join('');
@@ -448,10 +450,12 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
       <label>Player<select name="user_id" required>${memberOptions}</select></label><label>Team<select name="team_id" required>${teamOptions}</select></label>
       <button type="submit">Create pick</button></form><p class="muted">This does not invalidate any existing pick; use the individual invalidate action first if needed.</p></div>` : '';
 
+    const missingPicks = leagueID && week ? `<div class="panel"><h2>Players without a currently valid pick</h2>
+      ${missingPickRows ? `<ul>${missingPickRows}</ul>` : '<p class="muted">Every active player has a currently valid pick for this week.</p>'}</div>` : '';
     const content = `<div class="panel"><form class="filters" method="get">
       <label>League<select name="league_id" required><option value="">Choose…</option>${leagues.map(league => option(league.id, `${league.name} (${league.season})`, leagueID)).join('')}</select></label>
       <label>Week<input name="week" type="number" min="1" max="25" required value="${escapeHtml(week ?? '')}"></label><button type="submit">Show picks</button>
-    </form></div>${addPick}${leagueID && week ? `<div class="table-wrap"><table><thead><tr><th>Player</th><th>Pick</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5">No picks found.</td></tr>'}</tbody></table></div>` : '<p>Select a league and week.</p>'}`;
+    </form></div>${missingPicks}${addPick}${leagueID && week ? `<div class="table-wrap"><table><thead><tr><th>Player</th><th>Pick</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5">No picks found.</td></tr>'}</tbody></table></div>` : '<p>Select a league and week.</p>'}`;
     res.send(page('League picks', content, req.query.notice, req.query.notice_type));
   });
 
@@ -885,6 +889,15 @@ function activeMembersQuery(db, leagueID) {
     .orderBy('memberships.display_name');
 }
 
+function activeMembersWithoutCurrentPick(members, picks) {
+  const userIDsWithCurrentPick = new Set(
+    picks
+      .filter(pick => pick.invalidated_at == null)
+      .map(pick => String(pick.user_id))
+  );
+  return members.filter(member => !userIDsWithCurrentPick.has(String(member.user_id)));
+}
+
 function validMessageTemplateFormat(value, slots) {
   const format = String(value ?? '');
   if (!format.trim()) throw new AdminInputError('Message template text is required.');
@@ -1069,6 +1082,7 @@ module.exports = {
   achievementJobsForWeekSettings,
   adminAuthentication,
   createAdminRouter,
+  activeMembersWithoutCurrentPick,
   parseScheduleCsv,
   parseBasicAuthorization,
   validMessageTemplateFormat,

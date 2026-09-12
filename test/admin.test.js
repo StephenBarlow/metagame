@@ -5,6 +5,7 @@ const express = require('express');
 
 const {
   createAdminRouter,
+  activeMembersWithoutCurrentPick,
   parseBasicAuthorization,
   parseScheduleCsv,
   validMessageTemplateFormat,
@@ -41,6 +42,25 @@ test('basic authorization parser preserves colons in passwords', () => {
     username: 'admin',
     password: 'one:two'
   });
+});
+
+test('players without a currently valid pick excludes only active picks', () => {
+  const members = [
+    { user_id: 1, display_name: 'Alice' },
+    { user_id: 2, display_name: 'Bob' },
+    { user_id: 3, display_name: 'Casey' }
+  ];
+  const picks = [
+    { user_id: 1, invalidated_at: null },
+    { user_id: 2, invalidated_at: '2026-09-11T00:00:00.000Z' },
+    { user_id: 3, invalidated_at: null },
+    { user_id: 3, invalidated_at: null }
+  ];
+
+  assert.deepEqual(
+    activeMembersWithoutCurrentPick(members, picks).map(member => member.display_name),
+    ['Bob']
+  );
 });
 
 test('schedule CSV parsing validates and normalizes games without writing', async () => {
