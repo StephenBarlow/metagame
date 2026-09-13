@@ -515,6 +515,7 @@ function evaluateScorePattern(achievement, context) {
     if (config.one_team_score_at_least !== undefined &&
         Math.max(...result.margins.map(Math.abs)) < config.one_team_score_at_least) return false;
     if (config.total_score_at_most !== undefined && result.score > config.total_score_at_most) return false;
+    if (config.total_score_at_least !== undefined && result.score < config.total_score_at_least) return false;
     return true;
   });
 }
@@ -619,6 +620,25 @@ function evaluateFavoriteTeamOpponentResult(achievement, context) {
   );
 }
 
+function evaluateOtherMembersFavoriteTeamsResult(achievement, context) {
+  const config = achievement.condition_config;
+  return completedResultCandidates(achievement, context, (result, weekPick, userId) => {
+    if (result.outcome !== config.result || weekPick.picks.length !== 2) return false;
+    return weekPick.picks.every(pick => context.members.some(member =>
+      String(member.user_id) !== String(userId) &&
+      String(member.favorite_team_id) === String(pick.team_id)
+    ));
+  }, (result, weekPick, userId) => ({
+    matching_favorite_members_by_team: weekPick.picks.map(pick => ({
+      team_id: pick.team_id,
+      member_user_ids: context.members
+        .filter(member => String(member.user_id) !== String(userId) &&
+          String(member.favorite_team_id) === String(pick.team_id))
+        .map(member => member.user_id)
+    }))
+  }));
+}
+
 function pickedTeamIdsThroughWeek(userId, context) {
   const teamIds = new Set();
   for (let week = 1; week <= context.week; week += 1) {
@@ -673,6 +693,34 @@ function evaluateMatchingFinalScores(achievement, context) {
   });
 }
 
+function evaluateOnlyWinningMove(achievement, context) {
+  const weeklyResults = context.members.map(member => {
+    const weekPick = context.getWeekPick(member.user_id, context.week);
+    return {
+      userId: member.user_id,
+      weekPick,
+      result: context.getWeekResult(member.user_id, context.week)
+    };
+  });
+  const nonByePicks = weeklyResults.filter(({ weekPick }) =>
+    weekPick.picks.length === 2 && !weekPick.isBye
+  );
+  if (!nonByePicks.length || nonByePicks.some(({ result }) =>
+    !result.complete || result.outcome !== 'split'
+  )) return [];
+
+  return weeklyResults
+    .filter(({ weekPick, result }) => weekPick.isBye && result.complete)
+    .map(({ userId, weekPick }) => ({
+      userId,
+      evidence: {
+        bye_pick_ids: weekPick.picks.map(pick => pick.id),
+        split_user_ids: nonByePicks.map(({ userId: splitUserId }) => splitUserId),
+        non_bye_pick_count: nonByePicks.length
+      }
+    }));
+}
+
 function cumulativeScore(userId, throughWeek, context) {
   let score = 0;
   for (let week = 1; week <= throughWeek; week += 1) {
@@ -719,6 +767,30 @@ function evaluateMatchingWeeklyScore(achievement, context) {
         .map(other => other.userId)
     }
   }));
+}
+
+function evaluateNearAverageScore(achievement, context) {
+  const config = achievement.condition_config;
+  if (context.week < config.minimum_week || !context.members.length) return [];
+
+  const scores = context.members.map(member => ({
+    userId: member.user_id,
+    score: cumulativeScore(member.user_id, context.week, context)
+  }));
+  const leagueAverage = scores.reduce((sum, row) => sum + row.score, 0) / scores.length;
+  const maximumDifference = config.difference_from_average_below;
+
+  return scores
+    .filter(row => Math.abs(row.score - leagueAverage) < maximumDifference)
+    .map(row => ({
+      userId: row.userId,
+      evidence: {
+        cumulative_score: row.score,
+        league_average_score: leagueAverage,
+        difference_from_league_average: Math.abs(row.score - leagueAverage),
+        difference_from_average_below: maximumDifference
+      }
+    }));
 }
 
 function maximumPossibleScore(context) {
@@ -801,10 +873,13 @@ const evaluatorRegistry = {
   venueAndResult: evaluateVenueAndResult,
   favoriteTeamResult: evaluateFavoriteTeamResult,
   favoriteTeamOpponentResult: evaluateFavoriteTeamOpponentResult,
+  otherMembersFavoriteTeamsResult: evaluateOtherMembersFavoriteTeamsResult,
   soleUnpickedTeam: evaluateSoleUnpickedTeam,
   matchingFinalScores: evaluateMatchingFinalScores,
+  onlyWinningMove: evaluateOnlyWinningMove,
   overallStanding: evaluateOverallStanding,
   matchingWeeklyScore: evaluateMatchingWeeklyScore,
+  nearAverageScore: evaluateNearAverageScore,
   maximumPossibleScore: evaluateMaximumPossibleScore,
   resultStreak: evaluateResultStreak,
   finalWeekPickPattern: evaluateFinalWeekPickPattern

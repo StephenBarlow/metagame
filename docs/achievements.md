@@ -74,6 +74,11 @@ achievement once in each league, but never more than once in the same league.
 | High Altitude | Pick the Broncos and Jets in the same week. |
 | Hot Streak | Score points for eight consecutive weeks (ignoring byes). |
 | Cold Streak | Split for eight consecutive weeks (ignoring byes). |
+| Garbage Time | Score 30 or more points with a double-loss. (Repeatable) |
+| Baywatch | Pick the Bucs and Packers in the same week. |
+| The Only Winning Move | Take a bye in a week where every non-BYE pick results in a split. |
+| Exceptionally Average | End a week with a total score less than one point from the league average (week 2 or later). |
+| Crowd Pleaser | Achieve a double win with two teams that are favorite teams of other league members. |
 
 The descriptions are deliberately player-facing. The evaluator should use a
 stable key and structured condition data rather than parsing the description.

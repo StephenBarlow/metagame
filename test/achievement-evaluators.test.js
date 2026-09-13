@@ -55,6 +55,125 @@ test('Pick Two scoring matches the client double-win, double-loss, split, and by
   }).outcome, 'bye');
 });
 
+test('Garbage Time requires a 30-point double-loss', () => {
+  const achievement = {
+    key: 'GARBAGE_TIME',
+    evaluator: 'scorePattern',
+    condition_config: { pattern: 'double_loss', total_score_at_least: 30 }
+  };
+  const context = contextFixture({
+    picks: [
+      { id: 1, user_id: 10, team_id: 1, week: 1, invalidated_at: null },
+      { id: 2, user_id: 10, team_id: 2, week: 1, invalidated_at: null }
+    ],
+    teams: [
+      { id: 1, short_name: 'A', sports_league: 'NFL' },
+      { id: 2, short_name: 'B', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'X', away_team_score: 10, home_team_score: 40 },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'Y', away_team_score: 7, home_team_score: 14 }
+    ]
+  });
+
+  assert.deepEqual(evaluateAchievement(achievement, context).map(match => match.userId), [10]);
+  assert.equal(evaluateAchievement({
+    ...achievement,
+    condition_config: { pattern: 'double_loss', total_score_at_least: 31 }
+  }, context).length, 0);
+});
+
+test('The Only Winning Move requires a bye while every completed non-BYE pick splits', () => {
+  const achievement = { key: 'THE_ONLY_WINNING_MOVE', evaluator: 'onlyWinningMove', condition_config: {} };
+  const context = contextFixture({
+    members: [{ user_id: 1 }, { user_id: 2 }, { user_id: 3 }],
+    picks: [
+      { id: 1, user_id: 1, team_id: -1, week: 1, invalidated_at: null },
+      { id: 2, user_id: 1, team_id: -1, week: 1, invalidated_at: null },
+      { id: 3, user_id: 2, team_id: 10, week: 1, invalidated_at: null },
+      { id: 4, user_id: 2, team_id: 20, week: 1, invalidated_at: null },
+      { id: 5, user_id: 3, team_id: 30, week: 1, invalidated_at: null },
+      { id: 6, user_id: 3, team_id: 40, week: 1, invalidated_at: null }
+    ],
+    teams: [
+      { id: 10, short_name: 'A', sports_league: 'NFL' },
+      { id: 20, short_name: 'B', sports_league: 'NFL' },
+      { id: 30, short_name: 'C', sports_league: 'NFL' },
+      { id: 40, short_name: 'D', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'X', away_team_score: 24, home_team_score: 21 },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'Y', away_team_score: 10, home_team_score: 13 },
+      { id: 3, week: 1, away_team_short_name: 'C', home_team_short_name: 'Z', away_team_score: 14, home_team_score: 17 },
+      { id: 4, week: 1, away_team_short_name: 'D', home_team_short_name: 'W', away_team_score: 20, home_team_score: 17 }
+    ]
+  });
+
+  assert.deepEqual(evaluateAchievement(achievement, context).map(match => match.userId), [1]);
+  context.gamesByWeek.get(1)[2].away_team_score = 18;
+  assert.equal(evaluateAchievement(achievement, context).length, 0);
+});
+
+test('Exceptionally Average uses the cumulative floating-point league average from week two onward', () => {
+  const achievement = {
+    key: 'EXCEPTIONALLY_AVERAGE',
+    evaluator: 'nearAverageScore',
+    condition_config: { minimum_week: 2, difference_from_average_below: 1 }
+  };
+  const weeklyScores = new Map([
+    ['1:1', 5], ['1:2', 5],
+    ['2:1', 5], ['2:2', 6],
+    ['3:1', 7], ['3:2', 6]
+  ]);
+  const context = {
+    week: 2,
+    members: [{ user_id: 1 }, { user_id: 2 }, { user_id: 3 }],
+    getWeekResult: (userID, week) => ({
+      complete: true,
+      isBye: false,
+      score: weeklyScores.get(`${userID}:${week}`)
+    })
+  };
+
+  const matches = evaluateAchievement(achievement, context);
+  assert.deepEqual(matches.map(match => match.userId), [2]);
+  assert.equal(matches[0].evidence.league_average_score, 34 / 3);
+  context.week = 1;
+  assert.equal(evaluateAchievement(achievement, context).length, 0);
+});
+
+test('Crowd Pleaser requires a double-win with two other members\' favorite teams', () => {
+  const achievement = {
+    key: 'CROWD_PLEASER',
+    evaluator: 'otherMembersFavoriteTeamsResult',
+    condition_config: { result: 'double_win' }
+  };
+  const context = contextFixture({
+    members: [
+      { user_id: 1, favorite_team_id: 1 },
+      { user_id: 2, favorite_team_id: 10 },
+      { user_id: 3, favorite_team_id: 20 }
+    ],
+    picks: [
+      { id: 1, user_id: 1, team_id: 10, week: 1, invalidated_at: null },
+      { id: 2, user_id: 1, team_id: 20, week: 1, invalidated_at: null }
+    ],
+    teams: [
+      { id: 1, short_name: 'SELF', sports_league: 'NFL' },
+      { id: 10, short_name: 'A', sports_league: 'NFL' },
+      { id: 20, short_name: 'B', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'X', away_team_score: 21, home_team_score: 14 },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'Y', away_team_score: 17, home_team_score: 10 }
+    ]
+  });
+
+  assert.deepEqual(evaluateAchievement(achievement, context).map(match => match.userId), [1]);
+  context.members[2].favorite_team_id = null;
+  assert.equal(evaluateAchievement(achievement, context).length, 0);
+});
+
 test('teamCombination supports choosing any two distinct teams from an option set', () => {
   const context = contextFixture({
     picks: [
