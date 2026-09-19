@@ -84,6 +84,19 @@ function awardKey(achievement, league) {
     : `season:${league.season}`;
 }
 
+function wouldCreateAwardDetails(awards, achievements, members) {
+  const achievementById = new Map(achievements.map(achievement => [achievement.id, achievement]));
+  const membersByUserID = new Map(members.map(member => [String(member.user_id), member]));
+  return awards.map(row => ({
+    achievementKey: achievementById.get(row.achievement_id)?.key,
+    achievementName: achievementById.get(row.achievement_id)?.name,
+    userID: row.user_id,
+    displayName: membersByUserID.get(String(row.user_id))?.display_name,
+    week: row.week,
+    awardKey: row.award_key
+  }));
+}
+
 async function insertAwards(db, league, mode, context, matches, dryRun) {
   const proposed = matches.map(({ achievement, candidate }) => ({
     league_id: league.id,
@@ -113,7 +126,12 @@ async function insertAwards(db, league, mode, context, matches, dryRun) {
   );
 
   if (dryRun || !newAwards.length) {
-    return { proposed, created: [], alreadyPresent: proposed.length - newAwards.length };
+    return {
+      proposed,
+      created: [],
+      wouldCreate: dryRun ? newAwards : [],
+      alreadyPresent: proposed.length - newAwards.length
+    };
   }
 
   const created = await db('achievement_awards')
@@ -125,6 +143,7 @@ async function insertAwards(db, league, mode, context, matches, dryRun) {
   return {
     proposed,
     created,
+    wouldCreate: [],
     alreadyPresent: proposed.length - created.length
   };
 }
@@ -191,6 +210,7 @@ async function runAchievementJob(db, options) {
       ...row,
       achievementKey: achievementById.get(row.achievement_id)?.key
     }));
+    const wouldCreateAwards = wouldCreateAwardDetails(awardResult.wouldCreate, achievements, context.members);
 
     return {
       mode,
@@ -205,7 +225,8 @@ async function runAchievementJob(db, options) {
       matchedAwards: awardResult.proposed.length,
       createdAwards: created.length,
       alreadyPresent: awardResult.alreadyPresent,
-      wouldCreate: options.dryRun ? awardResult.proposed.length - awardResult.alreadyPresent : 0,
+      wouldCreate: options.dryRun ? awardResult.wouldCreate.length : 0,
+      ...(options.dryRun ? { wouldCreateAwards } : {}),
       created
     };
   });
@@ -216,5 +237,6 @@ module.exports = {
   enabledAchievements,
   integerOrFallback,
   runAchievementJob,
-  validateRunWindow
+  validateRunWindow,
+  wouldCreateAwardDetails
 };

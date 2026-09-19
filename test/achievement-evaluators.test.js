@@ -7,7 +7,7 @@ const { buildEvaluationContext } = require('../achievements/context');
 const { evaluateAchievement, maximumPossibleScore } = require('../achievements/evaluators');
 const { calculatePickTwoResult } = require('../achievements/scoring');
 const { parseArguments } = require('../jobs/evaluate-achievements');
-const { integerOrFallback, MODES } = require('../achievements/engine');
+const { integerOrFallback, MODES, wouldCreateAwardDetails } = require('../achievements/engine');
 const { effectiveLeagueWeek } = require('../resolvers');
 const { achievementEvaluationCommand, createRenderOneOffJob } = require('../render-one-off-jobs');
 const { achievementJobsForWeekSettings } = require('../admin');
@@ -842,6 +842,25 @@ test('one-off job arguments support both Render-friendly value forms', () => {
     parseArguments(['pick-locked', '--league-id=4', '--week', '7', '--dry-run']),
     { mode: 'pick-locked', leagueId: '4', week: '7', dryRun: true }
   );
+});
+
+test('dry-run award details identify the badge and recipient', () => {
+  const details = wouldCreateAwardDetails([
+    { achievement_id: 8, user_id: 10, week: 1, award_key: 'season:2026' }
+  ], [
+    { id: 8, key: 'HEEL_TURN', name: 'Heel Turn' }
+  ], [
+    { user_id: 10, display_name: 'Chris S' }
+  ]);
+
+  assert.deepEqual(details, [{
+    achievementKey: 'HEEL_TURN',
+    achievementName: 'Heel Turn',
+    userID: 10,
+    displayName: 'Chris S',
+    week: 1,
+    awardKey: 'season:2026'
+  }]);
 });
 
 test('a finalized-week run reconciles locked-pick awards too', () => {
