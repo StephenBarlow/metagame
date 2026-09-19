@@ -391,6 +391,44 @@ function evaluateMatchingPickGroup(achievement, context) {
     })));
 }
 
+function nonByeTeamPairKey(weekPick) {
+  if (weekPick.picks.length !== 2 || weekPick.isBye) return null;
+  return weekPick.picks.map(pick => String(pick.team_id)).sort().join(':');
+}
+
+function evaluatePreviousWeekMatchingPair(achievement, context) {
+  if (context.week < 2) return [];
+  return playerWeekCandidates(
+    context,
+    userId => {
+      const currentPair = nonByeTeamPairKey(context.getWeekPick(userId, context.week));
+      if (!currentPair) return false;
+      return context.members.some(member =>
+        String(member.user_id) !== String(userId) &&
+        Array.from({ length: context.week - 1 }, (_, index) => index + 1).some(week =>
+          nonByeTeamPairKey(context.getWeekPick(member.user_id, week)) === currentPair
+        )
+      );
+    },
+    userId => {
+      const currentWeekPick = context.getWeekPick(userId, context.week);
+      const currentPair = nonByeTeamPairKey(currentWeekPick);
+      const matchingPicks = context.members.flatMap(member => {
+        if (String(member.user_id) === String(userId)) return [];
+        return Array.from({ length: context.week - 1 }, (_, index) => index + 1).flatMap(week => {
+          const priorWeekPick = context.getWeekPick(member.user_id, week);
+          return nonByeTeamPairKey(priorWeekPick) === currentPair ? [{
+            user_id: member.user_id,
+            week,
+            pick_ids: priorWeekPick.picks.map(pick => pick.id)
+          }] : [];
+        });
+      });
+      return pickEvidence(currentWeekPick, { matching_prior_picks: matchingPicks });
+    }
+  );
+}
+
 function remainingGamesAtSubmission(userId, context) {
   const weekPick = context.getWeekPick(userId, context.week);
   if (weekPick.picks.length !== 2 || weekPick.isBye) return { eligible: false, submittedAt: null, games: [] };
@@ -639,6 +677,38 @@ function evaluateOtherMembersFavoriteTeamsResult(achievement, context) {
   }));
 }
 
+function otherMembersWhoseFavoriteIsOpponent(userId, pickedTeam, game, context) {
+  if (!pickedTeam || !game) return [];
+  return context.members.filter(member => {
+    if (String(member.user_id) === String(userId) || member.favorite_team_id === null || member.favorite_team_id === undefined) {
+      return false;
+    }
+    const favoriteTeam = context.teamsById.get(String(member.favorite_team_id));
+    return favoriteTeam && favoriteTeam.short_name !== pickedTeam.short_name &&
+      (game.away_team_short_name === favoriteTeam.short_name || game.home_team_short_name === favoriteTeam.short_name);
+  });
+}
+
+function evaluateOtherMembersFavoriteTeamOpponentsResult(achievement, context) {
+  const config = achievement.condition_config;
+  return completedResultCandidates(achievement, context, (result, weekPick, userId) => {
+    if (result.outcome !== config.result || weekPick.picks.length !== 2) return false;
+    return weekPick.picks.every((pick, index) =>
+      otherMembersWhoseFavoriteIsOpponent(userId, weekPick.teams[index], weekPick.games[index], context).length > 0
+    );
+  }, (result, weekPick, userId) => ({
+    matching_favorite_members_by_team: weekPick.picks.map((pick, index) => ({
+      team_id: pick.team_id,
+      member_user_ids: otherMembersWhoseFavoriteIsOpponent(
+        userId,
+        weekPick.teams[index],
+        weekPick.games[index],
+        context
+      ).map(member => member.user_id)
+    }))
+  }));
+}
+
 function pickedTeamIdsThroughWeek(userId, context) {
   const teamIds = new Set();
   for (let week = 1; week <= context.week; week += 1) {
@@ -693,7 +763,8 @@ function evaluateMatchingFinalScores(achievement, context) {
   });
 }
 
-function evaluateOnlyWinningMove(achievement, context) {
+function evaluateByeWhenAllNonByeResults(achievement, context) {
+  const qualifyingOutcomes = achievement.condition_config.qualifying_outcomes || ['split'];
   const weeklyResults = context.members.map(member => {
     const weekPick = context.getWeekPick(member.user_id, context.week);
     return {
@@ -706,7 +777,7 @@ function evaluateOnlyWinningMove(achievement, context) {
     weekPick.picks.length === 2 && !weekPick.isBye
   );
   if (!nonByePicks.length || nonByePicks.some(({ result }) =>
-    !result.complete || result.outcome !== 'split'
+    !result.complete || !qualifyingOutcomes.includes(result.outcome)
   )) return [];
 
   return weeklyResults
@@ -715,8 +786,9 @@ function evaluateOnlyWinningMove(achievement, context) {
       userId,
       evidence: {
         bye_pick_ids: weekPick.picks.map(pick => pick.id),
-        split_user_ids: nonByePicks.map(({ userId: splitUserId }) => splitUserId),
-        non_bye_pick_count: nonByePicks.length
+        qualifying_user_ids: nonByePicks.map(({ userId: qualifyingUserId }) => qualifyingUserId),
+        non_bye_pick_count: nonByePicks.length,
+        qualifying_outcomes: qualifyingOutcomes
       }
     }));
 }
@@ -865,6 +937,7 @@ const evaluatorRegistry = {
   latePickSubmission: evaluateLatePickSubmission,
   limitedGameAvailability: evaluateLimitedGameAvailability,
   matchingPickGroup: evaluateMatchingPickGroup,
+  previousWeekMatchingPair: evaluatePreviousWeekMatchingPair,
   opponentPickCount: evaluateOpponentPickCount,
   scoreMargins: evaluateScoreMargins,
   pickedGameResult: evaluatePickedGameResult,
@@ -874,9 +947,11 @@ const evaluatorRegistry = {
   favoriteTeamResult: evaluateFavoriteTeamResult,
   favoriteTeamOpponentResult: evaluateFavoriteTeamOpponentResult,
   otherMembersFavoriteTeamsResult: evaluateOtherMembersFavoriteTeamsResult,
+  otherMembersFavoriteTeamOpponentsResult: evaluateOtherMembersFavoriteTeamOpponentsResult,
   soleUnpickedTeam: evaluateSoleUnpickedTeam,
   matchingFinalScores: evaluateMatchingFinalScores,
-  onlyWinningMove: evaluateOnlyWinningMove,
+  onlyWinningMove: evaluateByeWhenAllNonByeResults,
+  byeWhenAllNonByeResults: evaluateByeWhenAllNonByeResults,
   overallStanding: evaluateOverallStanding,
   matchingWeeklyScore: evaluateMatchingWeeklyScore,
   nearAverageScore: evaluateNearAverageScore,

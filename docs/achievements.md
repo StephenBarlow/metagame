@@ -79,6 +79,11 @@ achievement once in each league, but never more than once in the same league.
 | The Only Winning Move | Take a bye in a week where every non-BYE pick results in a split. |
 | Exceptionally Average | End a week with a total score less than one point from the league average (week 2 or later). |
 | Crowd Pleaser | Achieve a double win with two teams that are favorite teams of other league members. |
+| Happy Pick Year! | Pick a team from a New Year's game. |
+| Expansion Pack | In a single week, pick two teams that joined the league after 1994. |
+| Time Loop! | Pick the exact same pair of teams that another player picked in a previous week. |
+| FOMO | Take a bye in a week when every non-BYE pick scored. |
+| Heel Turn | Achieve a double-win by picking two opponents of other players' favorite teams. |
 
 The descriptions are deliberately player-facing. The evaluator should use a
 stable key and structured condition data rather than parsing the description.

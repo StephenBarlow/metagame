@@ -114,6 +114,35 @@ test('The Only Winning Move requires a bye while every completed non-BYE pick sp
   assert.equal(evaluateAchievement(achievement, context).length, 0);
 });
 
+test('FOMO requires a bye while every completed non-BYE pick scores', () => {
+  const achievement = {
+    key: 'FOMO',
+    evaluator: 'byeWhenAllNonByeResults',
+    condition_config: { qualifying_outcomes: ['double_win', 'double_loss'] }
+  };
+  const context = contextFixture({
+    members: [{ user_id: 1 }, { user_id: 2 }],
+    picks: [
+      { id: 1, user_id: 1, team_id: -1, week: 1, invalidated_at: null },
+      { id: 2, user_id: 1, team_id: -1, week: 1, invalidated_at: null },
+      { id: 3, user_id: 2, team_id: 10, week: 1, invalidated_at: null },
+      { id: 4, user_id: 2, team_id: 20, week: 1, invalidated_at: null }
+    ],
+    teams: [
+      { id: 10, short_name: 'A', sports_league: 'NFL' },
+      { id: 20, short_name: 'B', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'X', away_team_score: 21, home_team_score: 14 },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'Y', away_team_score: 24, home_team_score: 17 }
+    ]
+  });
+
+  assert.deepEqual(evaluateAchievement(achievement, context).map(match => match.userId), [1]);
+  context.gamesByWeek.get(1)[1].away_team_score = 10;
+  assert.equal(evaluateAchievement(achievement, context).length, 0);
+});
+
 test('Exceptionally Average uses the cumulative floating-point league average from week two onward', () => {
   const achievement = {
     key: 'EXCEPTIONALLY_AVERAGE',
@@ -166,6 +195,40 @@ test('Crowd Pleaser requires a double-win with two other members\' favorite team
     games: [
       { id: 1, week: 1, away_team_short_name: 'A', home_team_short_name: 'X', away_team_score: 21, home_team_score: 14 },
       { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'Y', away_team_score: 17, home_team_score: 10 }
+    ]
+  });
+
+  assert.deepEqual(evaluateAchievement(achievement, context).map(match => match.userId), [1]);
+  context.members[2].favorite_team_id = null;
+  assert.equal(evaluateAchievement(achievement, context).length, 0);
+});
+
+test('Heel Turn requires a double-win over two other members\' favorite teams', () => {
+  const achievement = {
+    key: 'HEEL_TURN',
+    evaluator: 'otherMembersFavoriteTeamOpponentsResult',
+    condition_config: { result: 'double_win' }
+  };
+  const context = contextFixture({
+    members: [
+      { user_id: 1, favorite_team_id: 1 },
+      { user_id: 2, favorite_team_id: 10 },
+      { user_id: 3, favorite_team_id: 20 }
+    ],
+    picks: [
+      { id: 1, user_id: 1, team_id: 30, week: 1, invalidated_at: null },
+      { id: 2, user_id: 1, team_id: 40, week: 1, invalidated_at: null }
+    ],
+    teams: [
+      { id: 1, short_name: 'SELF', sports_league: 'NFL' },
+      { id: 10, short_name: 'A', sports_league: 'NFL' },
+      { id: 20, short_name: 'B', sports_league: 'NFL' },
+      { id: 30, short_name: 'C', sports_league: 'NFL' },
+      { id: 40, short_name: 'D', sports_league: 'NFL' }
+    ],
+    games: [
+      { id: 1, week: 1, away_team_short_name: 'C', home_team_short_name: 'A', away_team_score: 21, home_team_score: 14 },
+      { id: 2, week: 1, away_team_short_name: 'B', home_team_short_name: 'D', away_team_score: 10, home_team_score: 17 }
     ]
   });
 
@@ -696,6 +759,32 @@ test('Sheep awards each player sharing the same active non-BYE pair with five ot
   assert.deepEqual(matches.map(match => match.userId), [1, 2, 3, 4, 5, 6]);
   assert.deepEqual(matches[0].evidence.matching_user_ids, [2, 3, 4, 5, 6]);
   assert.equal(matches[0].evidence.matching_player_count, 6);
+});
+
+test('Time Loop matches an unordered non-BYE pair from another player\'s earlier week', () => {
+  const achievement = { key: 'TIME_LOOP', evaluator: 'previousWeekMatchingPair', condition_config: {} };
+  const context = contextFixture({
+    week: 2,
+    members: [{ user_id: 1 }, { user_id: 2 }],
+    picks: [
+      { id: 1, user_id: 2, team_id: 10, week: 1, invalidated_at: null },
+      { id: 2, user_id: 2, team_id: 20, week: 1, invalidated_at: null },
+      { id: 3, user_id: 1, team_id: 20, week: 2, invalidated_at: null },
+      { id: 4, user_id: 1, team_id: 10, week: 2, invalidated_at: null }
+    ],
+    teams: [
+      { id: 10, short_name: 'A', sports_league: 'NFL' },
+      { id: 20, short_name: 'B', sports_league: 'NFL' }
+    ]
+  });
+
+  const matches = evaluateAchievement(achievement, context);
+  assert.deepEqual(matches.map(match => match.userId), [1]);
+  assert.deepEqual(matches[0].evidence.matching_prior_picks, [{
+    user_id: 2,
+    week: 1,
+    pick_ids: [1, 2]
+  }]);
 });
 
 test('Great Minds requires exactly two players with the same scoring pick', () => {
