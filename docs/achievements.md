@@ -232,22 +232,30 @@ Achievement evaluation runs from the same build artifact as the API:
 
 ```sh
 bun run achievements:evaluate -- pick-locked --league-id 42
+bun run achievements:evaluate -- scores-updated --league-id 42
 bun run achievements:evaluate -- week-finalized --league-id 42
 ```
 
-The job has two modes:
+The job has three modes:
 
 - `pick-locked` evaluates `pick_locked` achievements. With no explicit
   `--week`, it evaluates the league's effective revealed week.
-- `week-finalized` reconciles both `pick_locked` and `week_finalized`
-  achievements. With no explicit `--week`, it evaluates the week immediately
-  before the league's effective current week. When that is the final scheduled
-  week, it also evaluates `season_finalized` achievements.
+- `scores-updated` evaluates `scores_updated` achievements. With no explicit
+  `--week`, it evaluates the league's effective current week. This mode is
+  manual only; it is not launched when league week settings change, and it
+  requires the target week to have been revealed.
+- `week-finalized` reconciles `pick_locked`, `scores_updated`, and
+  `week_finalized` achievements. With no explicit `--week`, it evaluates the
+  week immediately before the league's effective current week. When that is
+  the final scheduled week, it also evaluates `season_finalized` achievements.
 
 Both modes accept `--week N` and `--dry-run`. A run processes one league,
 skips concluded leagues, and rejects weeks that have not reached the requested
 lifecycle phase. Finalized-week runs also reject weeks with incomplete game
-scores.
+scores. A `scores-updated` run can award a badge only once the relevant picked
+games have non-NULL scores. The data model has no separate game-final flag, so
+only run it after entering final scores for those games; awards are not revoked
+if scores are later edited.
 
 The evaluator functions return evidence but do not write to the database.
 The job inserts awards afterward with `ON CONFLICT DO NOTHING`. Non-repeatable

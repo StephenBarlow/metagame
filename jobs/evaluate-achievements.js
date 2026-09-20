@@ -9,10 +9,12 @@ const { runAchievementJob } = require('../achievements/engine');
 function usage() {
   return `Usage:
   bun jobs/evaluate-achievements.js pick-locked --league-id <id> [--week <week>] [--dry-run]
+  bun jobs/evaluate-achievements.js scores-updated --league-id <id> [--week <week>] [--dry-run]
   bun jobs/evaluate-achievements.js week-finalized --league-id <id> [--week <week>] [--dry-run]
 
 If --week is omitted, pick-locked uses the effective revealed week and
-week-finalized uses the week immediately before the effective current week.`;
+scores-updated uses the effective current week. week-finalized uses the week
+immediately before the effective current week.`;
 }
 
 function parseArguments(argv) {

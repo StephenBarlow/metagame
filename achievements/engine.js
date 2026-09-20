@@ -5,7 +5,8 @@ const { evaluateAchievement } = require('./evaluators');
 
 const MODES = {
   'pick-locked': ['pick_locked'],
-  'week-finalized': ['pick_locked', 'week_finalized']
+  'scores-updated': ['scores_updated'],
+  'week-finalized': ['pick_locked', 'scores_updated', 'week_finalized']
 };
 
 function integerOrFallback(value, fallback) {
@@ -62,11 +63,14 @@ async function loadEvaluationData(db, league, week) {
 
 function validateRunWindow(mode, week, currentWeek, revealedWeek) {
   if (!Number.isInteger(week) || week < 1) throw new Error('The target week must be a positive integer.');
-  if (mode === 'pick-locked' && week > revealedWeek) {
+  if ((mode === 'pick-locked' || mode === 'scores-updated') && week > revealedWeek) {
     throw new Error(`Week ${week} is not locked; this league's revealed week is ${revealedWeek}.`);
   }
   if (mode === 'week-finalized' && week >= currentWeek) {
     throw new Error(`Week ${week} is not finalized; this league's current week is ${currentWeek}.`);
+  }
+  if (mode === 'scores-updated' && week > currentWeek) {
+    throw new Error(`Week ${week} has not started; this league's current week is ${currentWeek}.`);
   }
 }
 
@@ -150,7 +154,7 @@ async function insertAwards(db, league, mode, context, matches, dryRun) {
 
 async function runAchievementJob(db, options) {
   const mode = options.mode;
-  if (!MODES[mode]) throw new Error(`Unknown mode "${mode}". Use pick-locked or week-finalized.`);
+  if (!MODES[mode]) throw new Error(`Unknown mode "${mode}". Use pick-locked, scores-updated, or week-finalized.`);
   const leagueId = Number(options.leagueId);
   if (!Number.isInteger(leagueId) || leagueId < 1) throw new Error('leagueId must be a positive integer.');
 
@@ -174,7 +178,7 @@ async function runAchievementJob(db, options) {
     const revealedWeek = integerOrFallback(league.revealed_week,
       integerOrFallback(options.revealedWeek ?? process.env.REVEALED_WEEK, 0));
     const week = options.week === undefined
-      ? (mode === 'pick-locked' ? revealedWeek : currentWeek - 1)
+      ? (mode === 'pick-locked' ? revealedWeek : mode === 'scores-updated' ? currentWeek : currentWeek - 1)
       : Number(options.week);
     validateRunWindow(mode, week, currentWeek, revealedWeek);
 

@@ -7,7 +7,7 @@ const { buildEvaluationContext } = require('../achievements/context');
 const { evaluateAchievement, maximumPossibleScore } = require('../achievements/evaluators');
 const { calculatePickTwoResult } = require('../achievements/scoring');
 const { parseArguments } = require('../jobs/evaluate-achievements');
-const { integerOrFallback, MODES, wouldCreateAwardDetails } = require('../achievements/engine');
+const { integerOrFallback, MODES, validateRunWindow, wouldCreateAwardDetails } = require('../achievements/engine');
 const { effectiveLeagueWeek } = require('../resolvers');
 const { achievementEvaluationCommand, createRenderOneOffJob } = require('../render-one-off-jobs');
 const { achievementJobsForWeekSettings } = require('../admin');
@@ -864,13 +864,26 @@ test('dry-run award details identify the badge and recipient', () => {
 });
 
 test('a finalized-week run reconciles locked-pick awards too', () => {
-  assert.deepEqual(MODES['week-finalized'], ['pick_locked', 'week_finalized']);
+  assert.deepEqual(MODES['scores-updated'], ['scores_updated']);
+  assert.deepEqual(MODES['week-finalized'], ['pick_locked', 'scores_updated', 'week_finalized']);
+});
+
+test('scores-updated runs require the target week to be revealed but not finalized', () => {
+  assert.doesNotThrow(() => validateRunWindow('scores-updated', 2, 2, 2));
+  assert.throws(
+    () => validateRunWindow('scores-updated', 2, 2, 1),
+    /Week 2 is not locked/
+  );
 });
 
 test('Render job requests use a constrained achievement command', async () => {
   assert.equal(
     achievementEvaluationCommand('week-finalized', 42, 7),
     'bun run achievements:evaluate -- week-finalized --league-id 42 --week 7'
+  );
+  assert.equal(
+    achievementEvaluationCommand('scores-updated', 42, 7),
+    'bun run achievements:evaluate -- scores-updated --league-id 42 --week 7'
   );
   let request;
   const job = await createRenderOneOffJob('echo test', {

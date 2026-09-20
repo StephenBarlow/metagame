@@ -1,7 +1,7 @@
 'use strict';
 
 function achievementEvaluationCommand(mode, leagueId, week) {
-  if (!['pick-locked', 'week-finalized'].includes(mode)) {
+  if (!['pick-locked', 'scores-updated', 'week-finalized'].includes(mode)) {
     throw new Error(`Unsupported achievement evaluation mode: ${mode}`);
   }
   if (!Number.isInteger(leagueId) || leagueId < 1 || !Number.isInteger(week) || week < 1) {
