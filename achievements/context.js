@@ -59,6 +59,7 @@ function buildEvaluationContext(data) {
 
   const context = {
     ...data,
+    awards: data.awards || [],
     teamsById,
     gamesByWeek,
     gameByWeekAndTeam,

@@ -234,9 +234,10 @@ Achievement evaluation runs from the same build artifact as the API:
 bun run achievements:evaluate -- pick-locked --league-id 42
 bun run achievements:evaluate -- scores-updated --league-id 42
 bun run achievements:evaluate -- week-finalized --league-id 42
+bun run achievements:evaluate -- manual --league-id 42 --achievement-id 123
 ```
 
-The job has three modes:
+The job has four modes:
 
 - `pick-locked` evaluates `pick_locked` achievements. With no explicit
   `--week`, it evaluates the league's effective revealed week.
@@ -248,8 +249,11 @@ The job has three modes:
   `week_finalized` achievements. With no explicit `--week`, it evaluates the
   week immediately before the league's effective current week. When that is
   the final scheduled week, it also evaluates `season_finalized` achievements.
+- `manual` evaluates one explicitly named `manual` achievement. It requires
+  `--achievement-id`, uses the same prior-finalized-week default as
+  `week-finalized`, and is never started automatically.
 
-Both modes accept `--week N` and `--dry-run`. A run processes one league,
+All modes accept `--week N` and `--dry-run`. A run processes one league,
 skips concluded leagues, and rejects weeks that have not reached the requested
 lifecycle phase. Finalized-week runs also reject weeks with incomplete game
 scores. A `scores-updated` run can award a badge only once the relevant picked

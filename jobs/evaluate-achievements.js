@@ -11,10 +11,11 @@ function usage() {
   bun jobs/evaluate-achievements.js pick-locked --league-id <id> [--week <week>] [--dry-run]
   bun jobs/evaluate-achievements.js scores-updated --league-id <id> [--week <week>] [--dry-run]
   bun jobs/evaluate-achievements.js week-finalized --league-id <id> [--week <week>] [--dry-run]
+  bun jobs/evaluate-achievements.js manual --league-id <id> --achievement-id <id> [--week <week>] [--dry-run]
 
 If --week is omitted, pick-locked uses the effective revealed week and
 scores-updated uses the effective current week. week-finalized uses the week
-immediately before the effective current week.`;
+immediately before the effective current week; manual does the same.`;
 }
 
 function parseArguments(argv) {
@@ -33,6 +34,10 @@ function parseArguments(argv) {
       options.week = args[++index];
     } else if (argument.startsWith('--week=')) {
       options.week = argument.slice('--week='.length);
+    } else if (argument === '--achievement-id') {
+      options.achievementId = args[++index];
+    } else if (argument.startsWith('--achievement-id=')) {
+      options.achievementId = argument.slice('--achievement-id='.length);
     } else {
       throw new Error(`Unknown argument: ${argument}`);
     }

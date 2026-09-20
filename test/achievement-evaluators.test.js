@@ -22,7 +22,8 @@ function contextFixture(overrides = {}) {
     teams: overrides.teams || [],
     teamTags: overrides.teamTags || [],
     games: overrides.games || [],
-    gameTags: overrides.gameTags || []
+    gameTags: overrides.gameTags || [],
+    awards: overrides.awards || []
   });
 }
 
@@ -837,10 +838,45 @@ test('maximum possible score considers all teams, not only player availability',
   assert.equal(maximumPossibleScore(context), 17);
 });
 
+test('badge drought requires five award-free finalized weeks and excludes the badge itself', () => {
+  const achievement = {
+    id: 99,
+    key: 'WE_DONT_NEED_NO_STINKING_BADGES',
+    evaluator: 'badgeDrought',
+    condition_config: { week_count: 5 }
+  };
+  const games = Array.from({ length: 5 }, (_, index) => ({
+    id: index + 1,
+    week: index + 1,
+    start_time: `2026-09-${String(index + 1).padStart(2, '0')}T17:00:00.000Z`
+  }));
+  const context = contextFixture({
+    week: 5,
+    members: [
+      { user_id: 1, created_at: '2026-08-01T00:00:00.000Z' },
+      { user_id: 2, created_at: '2026-08-01T00:00:00.000Z' },
+      { user_id: 3, created_at: '2026-09-03T00:00:00.000Z' }
+    ],
+    games,
+    awards: [
+      { achievement_id: 12, user_id: 2, week: 3 },
+      { achievement_id: 99, user_id: 1, week: 5 }
+    ]
+  });
+
+  assert.deepEqual(evaluateAchievement(achievement, context).map(match => match.userId), [1]);
+  assert.deepEqual(evaluateAchievement(achievement, context)[0].evidence.award_free_weeks, [1, 2, 3, 4, 5]);
+  assert.equal(evaluateAchievement(achievement, { ...context, week: 4 }).length, 0);
+});
+
 test('one-off job arguments support both Render-friendly value forms', () => {
   assert.deepEqual(
     parseArguments(['pick-locked', '--league-id=4', '--week', '7', '--dry-run']),
     { mode: 'pick-locked', leagueId: '4', week: '7', dryRun: true }
+  );
+  assert.deepEqual(
+    parseArguments(['manual', '--league-id', '4', '--achievement-id=99']),
+    { mode: 'manual', leagueId: '4', achievementId: '99' }
   );
 });
 
@@ -866,6 +902,7 @@ test('dry-run award details identify the badge and recipient', () => {
 test('a finalized-week run reconciles locked-pick awards too', () => {
   assert.deepEqual(MODES['scores-updated'], ['scores_updated']);
   assert.deepEqual(MODES['week-finalized'], ['pick_locked', 'scores_updated', 'week_finalized']);
+  assert.deepEqual(MODES.manual, ['manual']);
 });
 
 test('scores-updated runs require the target week to be revealed but not finalized', () => {
@@ -873,6 +910,14 @@ test('scores-updated runs require the target week to be revealed but not finaliz
   assert.throws(
     () => validateRunWindow('scores-updated', 2, 2, 1),
     /Week 2 is not locked/
+  );
+});
+
+test('manual runs require a finalized target week', () => {
+  assert.doesNotThrow(() => validateRunWindow('manual', 5, 6, 5));
+  assert.throws(
+    () => validateRunWindow('manual', 6, 6, 6),
+    /Week 6 is not finalized/
   );
 });
 

@@ -923,6 +923,40 @@ function evaluateFinalWeekPickPattern(achievement, context) {
   );
 }
 
+function firstGameStartTime(context, week) {
+  const startTimes = (context.gamesByWeek.get(week) || [])
+    .map(game => new Date(game.start_time).getTime())
+    .filter(Number.isFinite);
+  return startTimes.length ? Math.min(...startTimes) : null;
+}
+
+function wasMemberForEntireWindow(member, context, firstWeek) {
+  if (!member?.created_at) return true;
+  const weekStart = firstGameStartTime(context, firstWeek);
+  const membershipStart = new Date(member.created_at).getTime();
+  return weekStart === null || !Number.isFinite(membershipStart) || membershipStart <= weekStart;
+}
+
+function evaluateBadgeDrought(achievement, context) {
+  const weekCount = Number(achievement.condition_config.week_count ?? 5);
+  const firstWeek = context.week - weekCount + 1;
+  if (!Number.isInteger(weekCount) || weekCount < 1 || firstWeek < 1) return [];
+
+  return playerWeekCandidates(
+    context,
+    userId => {
+      const member = context.members.find(row => String(row.user_id) === String(userId));
+      if (!wasMemberForEntireWindow(member, context, firstWeek)) return false;
+      return !context.awards.some(award =>
+        String(award.user_id) === String(userId) &&
+        String(award.achievement_id) !== String(achievement.id) &&
+        Number(award.week) >= firstWeek && Number(award.week) <= context.week
+      );
+    },
+    () => ({ award_free_weeks: Array.from({ length: weekCount }, (_, index) => firstWeek + index) })
+  );
+}
+
 const evaluatorRegistry = {
   teamCombination: evaluateTeamCombination,
   gameTagCombination: evaluateGameTagCombination,
@@ -957,7 +991,8 @@ const evaluatorRegistry = {
   nearAverageScore: evaluateNearAverageScore,
   maximumPossibleScore: evaluateMaximumPossibleScore,
   resultStreak: evaluateResultStreak,
-  finalWeekPickPattern: evaluateFinalWeekPickPattern
+  finalWeekPickPattern: evaluateFinalWeekPickPattern,
+  badgeDrought: evaluateBadgeDrought
 };
 
 function evaluateAchievement(achievement, context) {

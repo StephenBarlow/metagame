@@ -6,7 +6,8 @@ const { evaluateAchievement } = require('./evaluators');
 const MODES = {
   'pick-locked': ['pick_locked'],
   'scores-updated': ['scores_updated'],
-  'week-finalized': ['pick_locked', 'scores_updated', 'week_finalized']
+  'week-finalized': ['pick_locked', 'scores_updated', 'week_finalized'],
+  manual: ['manual']
 };
 
 function integerOrFallback(value, fallback) {
@@ -38,10 +39,10 @@ async function enabledAchievements(db, leagueId) {
   return (await query.orderBy('key')).map(parseConditionConfig);
 }
 
-async function loadEvaluationData(db, league, week) {
-  const [members, picks, teams, teamTags, games, gameTags] = await Promise.all([
+async function loadEvaluationData(db, league, week, options = {}) {
+  const queries = [
     db('memberships')
-      .select(['user_id', 'display_name', 'favorite_team_id'])
+      .select(['user_id', 'display_name', 'favorite_team_id', 'created_at'])
       .where({ league_id: league.id, revoked_at: null }),
     db('picks').select('*').where({ league_id: league.id }),
     db('teams').select('*').where({ sports_league: league.sports_league }),
@@ -57,8 +58,14 @@ async function loadEvaluationData(db, league, week) {
         'sports_games.season': league.season,
         'sports_games.sports_league': league.sports_league
       })
-  ]);
-  return { league, week, members, picks, teams, teamTags, games, gameTags };
+  ];
+  if (options.includeAwards) {
+    queries.push(db('achievement_awards')
+      .select(['achievement_id', 'user_id', 'week'])
+      .where({ league_id: league.id }));
+  }
+  const [members, picks, teams, teamTags, games, gameTags, awards = []] = await Promise.all(queries);
+  return { league, week, members, picks, teams, teamTags, games, gameTags, awards };
 }
 
 function validateRunWindow(mode, week, currentWeek, revealedWeek) {
@@ -66,7 +73,7 @@ function validateRunWindow(mode, week, currentWeek, revealedWeek) {
   if ((mode === 'pick-locked' || mode === 'scores-updated') && week > revealedWeek) {
     throw new Error(`Week ${week} is not locked; this league's revealed week is ${revealedWeek}.`);
   }
-  if (mode === 'week-finalized' && week >= currentWeek) {
+  if ((mode === 'week-finalized' || mode === 'manual') && week >= currentWeek) {
     throw new Error(`Week ${week} is not finalized; this league's current week is ${currentWeek}.`);
   }
   if (mode === 'scores-updated' && week > currentWeek) {
@@ -154,7 +161,14 @@ async function insertAwards(db, league, mode, context, matches, dryRun) {
 
 async function runAchievementJob(db, options) {
   const mode = options.mode;
-  if (!MODES[mode]) throw new Error(`Unknown mode "${mode}". Use pick-locked, scores-updated, or week-finalized.`);
+  if (!MODES[mode]) throw new Error(`Unknown mode "${mode}". Use pick-locked, scores-updated, week-finalized, or manual.`);
+  const achievementId = options.achievementId === undefined ? null : Number(options.achievementId);
+  if (mode === 'manual' && (!Number.isInteger(achievementId) || achievementId < 1)) {
+    throw new Error('Manual evaluation requires a positive --achievement-id.');
+  }
+  if (mode !== 'manual' && options.achievementId !== undefined) {
+    throw new Error('--achievement-id is only supported for manual evaluation.');
+  }
   const leagueId = Number(options.leagueId);
   if (!Number.isInteger(leagueId) || leagueId < 1) throw new Error('leagueId must be a positive integer.');
 
@@ -184,18 +198,25 @@ async function runAchievementJob(db, options) {
 
     const [achievements, evaluationData] = await Promise.all([
       enabledAchievements(trx, league.id),
-      loadEvaluationData(trx, league, week)
+      loadEvaluationData(trx, league, week, { includeAwards: mode === 'manual' })
     ]);
     const context = buildEvaluationContext(evaluationData);
-    if (mode === 'week-finalized') assertFinalScores(context);
+    if (mode === 'week-finalized' || mode === 'manual') assertFinalScores(context);
 
     const phases = new Set(MODES[mode]);
     if (mode === 'week-finalized' && week === context.maxScheduledWeek) {
       phases.add('season_finalized');
     }
-    const applicableAchievements = achievements.filter(achievement =>
+    let applicableAchievements = achievements.filter(achievement =>
       phases.has(achievement.evaluation_phase)
     );
+    if (mode === 'manual') {
+      const achievement = applicableAchievements.find(row => Number(row.id) === achievementId);
+      if (!achievement) {
+        throw new Error(`Achievement ${achievementId} is not active and enabled for this league's manual evaluation.`);
+      }
+      applicableAchievements = [achievement];
+    }
 
     const matches = [];
     for (const achievement of applicableAchievements) {
@@ -224,6 +245,7 @@ async function runAchievementJob(db, options) {
       week,
       currentWeek,
       revealedWeek,
+      ...(mode === 'manual' ? { achievementId } : {}),
       dryRun: Boolean(options.dryRun),
       evaluatedAchievements: applicableAchievements.length,
       matchedAwards: awardResult.proposed.length,
