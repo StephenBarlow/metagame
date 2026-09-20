@@ -146,12 +146,12 @@
   {
     "key": "GET_THE_HORNS",
     "name": "Get the Horns",
-    "description": "Pick the Rams and Vikings in the same week.",
+    "description": "Pick any two of the Rams, Vikings, Texans, and Bills in the same week.",
     "icon_id": null,
     "evaluator": "teamCombination",
     "evaluation_phase": "pick_locked",
     "scope": "player_week",
-    "condition_config": { "requirements": [{ "match": { "short_name": "LAR" }, "count": 1 }, { "match": { "short_name": "MIN" }, "count": 1 }] },
+    "condition_config": { "requirements": [{ "match": { "tag": "horns" }, "count": 2 }] },
     "repeatable": false,
     "active": true
   },
