@@ -312,6 +312,30 @@ class PGDB {
       .orderBy('slots.position');
   }
 
+  messageReactionsQuery(messageIDs) {
+    return this.knex('message_reactions as reactions')
+      .select([
+        'reactions.id as reaction_id',
+        'reactions.message_id',
+        'reactions.reaction_type',
+        'reactors.user_id as reactor_user_id',
+        'reactors.league_id as reactor_league_id',
+        'reactors.display_name as reactor_display_name',
+        'users.email as reactor_email',
+        'users.limited as reactor_limited'
+      ])
+      .innerJoin('messages', 'messages.id', 'reactions.message_id')
+      .innerJoin('memberships as reactors', function() {
+        this.on('reactors.user_id', '=', 'reactions.user_id')
+          .andOn('reactors.league_id', '=', 'messages.league_id');
+      })
+      .innerJoin('users', 'users.id', 'reactions.user_id')
+      .whereIn('reactions.message_id', messageIDs)
+      .whereNull('reactions.invalidated_at')
+      .orderBy('reactions.created_at')
+      .orderBy('reactions.id');
+  }
+
   leagueOwnerQuery(leagueID, ownerID) {
     return this.knex
       .select('*')
@@ -672,6 +696,11 @@ class PGDB {
     return this.messageSelectionsQuery(messageIDs);
   }
 
+  async getMessageReactions(messageIDs) {
+    if (!messageIDs.length) return [];
+    return this.messageReactionsQuery(messageIDs);
+  }
+
   async getPicksForLeague(leagueID, leagueConcluded = false, revealedWeek) {
     const val = await this.cacheQuery(
       this.picksForLeagueQuery(leagueID, leagueConcluded, revealedWeek),
@@ -784,6 +813,56 @@ class PGDB {
       })));
 
       return insertedMessage;
+    });
+  }
+
+  async setMessageReaction(messageID, userID, reactionType) {
+    return this.knex.transaction(async trx => {
+      const message = await trx('messages')
+        .select(['id', 'league_id'])
+        .where({ id: messageID, invalidated_at: null })
+        .forUpdate()
+        .first();
+      if (!message) return { reason: 'MESSAGE_NOT_FOUND' };
+
+      const membership = await trx('memberships')
+        .select('id')
+        .where({ user_id: userID, league_id: message.league_id, revoked_at: null })
+        .first();
+      if (!membership) return { reason: 'NOT_LEAGUE_MEMBER' };
+
+      const existing = await trx('message_reactions')
+        .select('id')
+        .where({ message_id: messageID, user_id: userID })
+        .forUpdate()
+        .first();
+      if (reactionType === null) {
+        if (existing) {
+          await trx('message_reactions')
+            .where({ id: existing.id })
+            .whereNull('invalidated_at')
+            .update({
+              invalidated_at: trx.raw('CURRENT_TIMESTAMP'),
+              updated_at: trx.raw('CURRENT_TIMESTAMP')
+            });
+        }
+      } else if (existing) {
+        await trx('message_reactions')
+          .where({ id: existing.id })
+          .update({
+            reaction_type: reactionType,
+            invalidated_at: null,
+            updated_at: trx.raw('CURRENT_TIMESTAMP')
+          });
+      } else {
+        await trx('message_reactions').insert({
+          message_id: messageID,
+          user_id: userID,
+          reaction_type: reactionType
+        });
+      }
+
+      return { messageID };
     });
   }
 

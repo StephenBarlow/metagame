@@ -139,6 +139,17 @@ type LeagueMessageSelection {
   value: MessageSelectionValue!
 }
 
+enum MessageReactionType {
+  UPVOTE
+  DOWNVOTE
+}
+
+type MessageReaction {
+  id: ID!
+  reactionType: MessageReactionType!
+  user: User!
+}
+
 type LeagueMessage {
   id: ID!
   week: Int!
@@ -146,6 +157,7 @@ type LeagueMessage {
   author: User!
   template: MessageTemplate!
   selections: [LeagueMessageSelection!]!
+  reactions: [MessageReaction!]!
 }
 
 input SubmitMessageSelection {
@@ -164,6 +176,17 @@ input SubmitMessageRequest {
 
 type SubmitMessageResponse {
   message: LeagueMessage
+  errors: [Error!]
+}
+
+input SetMessageReactionRequest {
+  userID: ID!
+  messageID: ID!
+  reactionType: MessageReactionType
+}
+
+type SetMessageReactionResponse {
+  reactions: [MessageReaction!]!
   errors: [Error!]
 }
 
@@ -235,6 +258,7 @@ type Mutation {
   #addUserToFantasyLeague(request: AddUserToFantasyLeagueRequest!): AddUserToFantasyLeagueResponse
   setFavoriteTeam(request: SetFavoriteTeamRequest!): SetFavoriteTeamResponse
   submitMessage(request: SubmitMessageRequest!): SubmitMessageResponse
+  setMessageReaction(request: SetMessageReactionRequest!): SetMessageReactionResponse
   submitPick(request: SubmitPickRequest!): SubmitPickResponse
   invalidatePicks(request: InvalidatePicksRequest!): InvalidatePicksResponse
   #createSportsGame(request: CreateSportsGameRequest!): CreateSportsGameResponse

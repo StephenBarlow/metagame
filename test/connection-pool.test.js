@@ -94,7 +94,8 @@ test('message read queries build valid PostgreSQL without executing them', async
     db.messageTemplatesQuery([1, 2], false),
     db.messageValuesQuery('adjective'),
     db.leagueMessagesQuery(3, 4),
-    db.messageSelectionsQuery([8, 9])
+    db.messageSelectionsQuery([8, 9]),
+    db.messageReactionsQuery([8, 9])
   ].map(query => query.toSQL());
 
   assert.ok(queries.every(({ method }) => method === 'select'));
@@ -104,6 +105,7 @@ test('message read queries build valid PostgreSQL without executing them', async
   assert.match(queries[3].sql, /limit \?/i);
   assert.equal(queries[3].bindings.at(-1), MAX_LEAGUE_MESSAGES);
   assert.match(queries[4].sql, /message_selections/);
+  assert.match(queries[5].sql, /message_reactions/);
 });
 
 test('message rate limits allow the first three per minute and first thirty per week', () => {

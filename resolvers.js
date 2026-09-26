@@ -115,6 +115,7 @@ const resolvers = {
   },
   Mutation: {
     submitMessage: messageResolvers.submitMessage,
+    setMessageReaction: messageResolvers.setMessageReaction,
     async setFavoriteTeam(parent, { request }, { dataSources }) {
       const userID = Number(request.userID);
       const leagueID = Number(request.leagueID);

@@ -319,6 +319,7 @@ test('submitMessage validates and stores typed selections while returning struct
           createdAt
           author { id displayName(leagueID: $leagueID) }
           template { id key format }
+          reactions { id reactionType }
           selections {
             slot { id key position }
             value {
@@ -406,6 +407,7 @@ test('submitMessage validates and stores typed selections while returning struct
       createdAt: '2026-09-20T12:00:00.000Z',
       author: { id: '1', displayName: 'Author' },
       template: { id: '7', key: 'ADJECTIVE_PICK', format: '{adjective} pick, {player}!' },
+      reactions: [],
       selections: [
         {
           slot: { id: '70', key: 'adjective', position: 0 },
@@ -464,6 +466,16 @@ test('league messages are readable regardless of revealed week and expose curren
           slot_position: 0,
           slot_prompt: 'Player, team, or outcome',
           slot_value_type: 'catalog_value'
+        }],
+        getMessageReactions: async () => [{
+          reaction_id: 22,
+          message_id: 9,
+          reaction_type: 'upvote',
+          reactor_user_id: 2,
+          reactor_league_id: 2,
+          reactor_display_name: 'Reactor',
+          reactor_email: 'reactor@example.com',
+          reactor_limited: false
         }]
       }
     }
@@ -473,6 +485,56 @@ test('league messages are readable regardless of revealed week and expose curren
   assert.deepEqual(requestedVisibility, { leagueID: 2, week: 3 });
   assert.equal(messages[0].template.format, 'Behold, {subject}!');
   assert.equal(messages[0].selections[0].value.text, 'chaos');
+  assert.deepEqual(messages[0].reactions.map(reaction => ({
+    id: reaction.id,
+    reactionType: reaction.reactionType,
+    displayName: reaction.user.displayName
+  })), [{ id: 22, reactionType: 'UPVOTE', displayName: 'Reactor' }]);
+});
+
+test('setMessageReaction returns active reactions with their reactors', async (t) => {
+  const server = new ApolloServer({ typeDefs, resolvers });
+  t.after(() => server.stop());
+  let stored;
+  const response = await server.executeOperation({
+    query: `mutation React($request: SetMessageReactionRequest!, $leagueID: ID!) {
+      setMessageReaction(request: $request) {
+        reactions { id reactionType user { id displayName(leagueID: $leagueID) } }
+        errors { code message }
+      }
+    }`,
+    variables: {
+      leagueID: '2',
+      request: { userID: '3', messageID: '9', reactionType: 'DOWNVOTE' }
+    }
+  }, {
+    contextValue: {
+      dataSources: {
+        pg: {
+          setMessageReaction: async (...args) => {
+            stored = args;
+            return { messageID: 9 };
+          },
+          getMessageReactions: async () => [{
+            reaction_id: 22,
+            message_id: 9,
+            reaction_type: 'downvote',
+            reactor_user_id: 3,
+            reactor_league_id: 2,
+            reactor_display_name: 'Reactor',
+            reactor_email: 'reactor@example.com',
+            reactor_limited: false
+          }]
+        }
+      }
+    }
+  });
+
+  assert.deepEqual(stored, [9, 3, 'downvote']);
+  assert.deepEqual(JSON.parse(JSON.stringify(response.body.singleResult.data.setMessageReaction)), {
+    reactions: [{ id: '22', reactionType: 'DOWNVOTE', user: { id: '3', displayName: 'Reactor' } }],
+    errors: []
+  });
 });
 
 test('limited league members are excluded from message template people', async () => {

@@ -11,6 +11,13 @@ const MESSAGE_VALUE_TYPES = {
 const MESSAGE_VALUE_TYPES_BY_DB_VALUE = Object.fromEntries(
   Object.entries(MESSAGE_VALUE_TYPES).map(([graphqlValue, databaseValue]) => [databaseValue, graphqlValue])
 );
+const MESSAGE_REACTION_TYPES = {
+  UPVOTE: 'upvote',
+  DOWNVOTE: 'downvote'
+};
+const MESSAGE_REACTION_TYPES_BY_DB_VALUE = Object.fromEntries(
+  Object.entries(MESSAGE_REACTION_TYPES).map(([graphqlValue, databaseValue]) => [databaseValue, graphqlValue])
+);
 
 async function messageTemplates(parent, args, { dataSources }) {
   try {
@@ -128,7 +135,8 @@ async function submitMessage(parent, { request }, { dataSources }) {
         createdAt: new Date(inserted.created_at).toISOString(),
         author: messageUser(author, authorMembership),
         template,
-        selections: responseSelections
+        selections: responseSelections,
+        reactions: []
       },
       errors: []
     };
@@ -147,14 +155,40 @@ async function leagueMessages(league, { week }, { dataSources }) {
     if (!rows.length) return [];
     const messageIDs = rows.map(row => row.message_id);
     const templateIDs = [...new Set(rows.map(row => row.template_id))];
-    const [selectionRows, templateRows] = await Promise.all([
+    const [selectionRows, templateRows, reactionRows] = await Promise.all([
       dataSources.pg.getMessageSelections(messageIDs),
-      dataSources.pg.getMessageTemplatesByIds(templateIDs)
+      dataSources.pg.getMessageTemplatesByIds(templateIDs),
+      dataSources.pg.getMessageReactions(messageIDs)
     ]);
-    return leagueMessagesFromRows(rows, selectionRows, templateRows);
+    return leagueMessagesFromRows(rows, selectionRows, templateRows, reactionRows);
   } catch (err) {
     console.log(err.stack);
     return [];
+  }
+}
+
+async function setMessageReaction(parent, { request }, { dataSources }) {
+  const userID = positiveInteger(request.userID);
+  const messageID = positiveInteger(request.messageID);
+  const reactionType = request.reactionType === null || request.reactionType === undefined
+    ? null
+    : MESSAGE_REACTION_TYPES[request.reactionType];
+  if (!userID || !messageID || (request.reactionType !== null && request.reactionType !== undefined && !reactionType)) {
+    return reactionError('User, message, and reaction type must be valid.');
+  }
+
+  try {
+    const result = await dataSources.pg.setMessageReaction(messageID, userID, reactionType);
+    if (result.reason === 'MESSAGE_NOT_FOUND') return reactionError('Message not found or no longer available.');
+    if (result.reason === 'NOT_LEAGUE_MEMBER') return reactionError('User is not an active member of this league.');
+    const rows = await dataSources.pg.getMessageReactions([messageID]);
+    return { reactions: messageReactionsFromRows(rows), errors: [] };
+  } catch (err) {
+    console.log(err.stack);
+    return {
+      reactions: [],
+      errors: [{ code: GQL_UNKNOWN_ERROR, message: 'Failed to save message reaction. Please retry.' }]
+    };
   }
 }
 
@@ -170,6 +204,13 @@ function positiveInteger(value) {
 function messageError(message) {
   return {
     message: null,
+    errors: [{ code: GQL_INVALID_INPUT, message }]
+  };
+}
+
+function reactionError(message) {
+  return {
+    reactions: [],
     errors: [{ code: GQL_INVALID_INPUT, message }]
   };
 }
@@ -310,11 +351,38 @@ function renderMessage(template, renderedValues) {
   return valid ? text : null;
 }
 
-function leagueMessagesFromRows(messageRows, selectionRows, templateRows) {
+function messageReactionFromRow(row) {
+  return {
+    id: row.reaction_id,
+    reactionType: MESSAGE_REACTION_TYPES_BY_DB_VALUE[row.reaction_type],
+    user: {
+      __typename: 'User',
+      id: row.reactor_user_id,
+      email: row.reactor_email,
+      limited: Boolean(row.reactor_limited),
+      displayName: row.reactor_display_name,
+      membershipLeagueID: row.reactor_league_id
+    }
+  };
+}
+
+function messageReactionsFromRows(rows) {
+  return rows.map(messageReactionFromRow);
+}
+
+function leagueMessagesFromRows(messageRows, selectionRows, templateRows, reactionRows = []) {
   const templates = new Map(messageTemplatesFromRows(templateRows)
     .map(template => [String(template.id), template]));
   const messagesByID = new Map(messageRows.map(message => [String(message.message_id), message]));
   const selectionsByMessage = new Map();
+  const reactionsByMessage = new Map();
+
+  for (const reactionRow of reactionRows) {
+    const messageID = reactionRow.message_id;
+    const reactions = reactionsByMessage.get(String(messageID)) || [];
+    reactions.push(messageReactionFromRow(reactionRow));
+    reactionsByMessage.set(String(messageID), reactions);
+  }
 
   for (const row of selectionRows) {
     const messageRow = messagesByID.get(String(row.message_id));
@@ -366,12 +434,14 @@ function leagueMessagesFromRows(messageRows, selectionRows, templateRows) {
       membershipLeagueID: row.league_id
     },
     template: templates.get(String(row.template_id)),
-    selections: selectionsByMessage.get(String(row.message_id)) || []
+    selections: selectionsByMessage.get(String(row.message_id)) || [],
+    reactions: reactionsByMessage.get(String(row.message_id)) || []
   }));
 }
 
 exports.messageTemplates = messageTemplates;
 exports.messageValues = messageValues;
 exports.submitMessage = submitMessage;
+exports.setMessageReaction = setMessageReaction;
 exports.leagueMessages = leagueMessages;
 exports.resolveMessageSelectionValueType = resolveMessageSelectionValueType;
