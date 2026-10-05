@@ -106,6 +106,7 @@ test('message read queries build valid PostgreSQL without executing them', async
   assert.equal(queries[3].bindings.at(-1), MAX_LEAGUE_MESSAGES);
   assert.match(queries[4].sql, /message_selections/);
   assert.match(queries[5].sql, /message_reactions/);
+  assert.match(db.achievementAwardsForLeagueQuery(3).toSQL().sql, /invalidated_at" is null/i);
 });
 
 test('message rate limits allow the first three per minute and first thirty per week', () => {

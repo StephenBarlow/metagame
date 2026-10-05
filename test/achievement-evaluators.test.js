@@ -860,7 +860,8 @@ test('badge drought requires five award-free finalized weeks and excludes the ba
     games,
     awards: [
       { achievement_id: 12, user_id: 2, week: 3 },
-      { achievement_id: 99, user_id: 1, week: 5 }
+      { achievement_id: 13, user_id: 1, week: 4, invalidated_at: '2026-09-25T00:00:00.000Z' },
+      { achievement_id: 99, user_id: 1, week: 5, invalidated_at: null }
     ]
   });
 

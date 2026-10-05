@@ -61,7 +61,7 @@ async function loadEvaluationData(db, league, week, options = {}) {
   ];
   if (options.includeAwards) {
     queries.push(db('achievement_awards')
-      .select(['achievement_id', 'user_id', 'week'])
+      .select(['achievement_id', 'user_id', 'week', 'invalidated_at'])
       .where({ league_id: league.id }));
   }
   const [members, picks, teams, teamTags, games, gameTags, awards = []] = await Promise.all(queries);
@@ -125,37 +125,56 @@ async function insertAwards(db, league, mode, context, matches, dryRun) {
 
   const existing = proposed.length
     ? await db('achievement_awards')
-      .select(['achievement_id', 'user_id', 'award_key'])
+      .select(['id', 'achievement_id', 'user_id', 'award_key', 'invalidated_at'])
       .where({ league_id: league.id })
       .whereIn('achievement_id', [...new Set(proposed.map(row => row.achievement_id))])
     : [];
-  const existingKeys = new Set(existing.map(row =>
-    `${row.achievement_id}:${row.user_id}:${row.award_key}`
-  ));
-  const newAwards = proposed.filter(row =>
-    !existingKeys.has(`${row.achievement_id}:${row.user_id}:${row.award_key}`)
-  );
+  const identity = row => `${row.achievement_id}:${row.user_id}:${row.award_key}`;
+  const existingByIdentity = new Map(existing.map(row => [identity(row), row]));
+  const newAwards = proposed.filter(row => !existingByIdentity.has(identity(row)));
+  const reinstatements = proposed.filter(row => existingByIdentity.get(identity(row))?.invalidated_at !== null &&
+    existingByIdentity.get(identity(row))?.invalidated_at !== undefined);
 
-  if (dryRun || !newAwards.length) {
+  if (dryRun || (!newAwards.length && !reinstatements.length)) {
     return {
       proposed,
       created: [],
-      wouldCreate: dryRun ? newAwards : [],
-      alreadyPresent: proposed.length - newAwards.length
+      reinstated: [],
+      wouldCreate: dryRun ? [...newAwards, ...reinstatements] : [],
+      alreadyPresent: proposed.length - newAwards.length - reinstatements.length
     };
   }
 
-  const created = await db('achievement_awards')
-    .insert(newAwards.map(row => ({ ...row, evidence: JSON.stringify(row.evidence) })))
-    .onConflict(['league_id', 'achievement_id', 'user_id', 'award_key'])
-    .ignore()
-    .returning(['id', 'achievement_id', 'user_id', 'week', 'award_key']);
+  const created = newAwards.length
+    ? await db('achievement_awards')
+      .insert(newAwards.map(row => ({ ...row, evidence: JSON.stringify(row.evidence) })))
+      .onConflict(['league_id', 'achievement_id', 'user_id', 'award_key'])
+      .ignore()
+      .returning(['id', 'achievement_id', 'user_id', 'week', 'award_key'])
+    : [];
+
+  const reinstated = [];
+  for (const award of reinstatements) {
+    const existingAward = existingByIdentity.get(identity(award));
+    const rows = await db('achievement_awards')
+      .where({ id: existingAward.id })
+      .whereNotNull('invalidated_at')
+      .update({
+        week: award.week,
+        awarded_at: db.raw('CURRENT_TIMESTAMP'),
+        invalidated_at: null,
+        evidence: JSON.stringify(award.evidence)
+      })
+      .returning(['id', 'achievement_id', 'user_id', 'week', 'award_key']);
+    reinstated.push(...rows);
+  }
 
   return {
     proposed,
     created,
+    reinstated,
     wouldCreate: [],
-    alreadyPresent: proposed.length - created.length
+    alreadyPresent: proposed.length - created.length - reinstated.length
   };
 }
 
@@ -235,6 +254,10 @@ async function runAchievementJob(db, options) {
       ...row,
       achievementKey: achievementById.get(row.achievement_id)?.key
     }));
+    const reinstated = awardResult.reinstated.map(row => ({
+      ...row,
+      achievementKey: achievementById.get(row.achievement_id)?.key
+    }));
     const wouldCreateAwards = wouldCreateAwardDetails(awardResult.wouldCreate, achievements, context.members);
 
     return {
@@ -250,10 +273,12 @@ async function runAchievementJob(db, options) {
       evaluatedAchievements: applicableAchievements.length,
       matchedAwards: awardResult.proposed.length,
       createdAwards: created.length,
+      reinstatedAwards: reinstated.length,
       alreadyPresent: awardResult.alreadyPresent,
       wouldCreate: options.dryRun ? awardResult.wouldCreate.length : 0,
       ...(options.dryRun ? { wouldCreateAwards } : {}),
-      created
+      created,
+      reinstated
     };
   });
 }

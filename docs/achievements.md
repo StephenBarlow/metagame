@@ -140,7 +140,7 @@ an individual league.
 
 ### `achievement_awards`
 
-One immutable award per player, achievement, and league:
+One award record per player, achievement, and league/key combination:
 
 - `id`
 - `league_id`
@@ -148,6 +148,7 @@ One immutable award per player, achievement, and league:
 - `user_id`
 - `week`
 - `awarded_at`
+- optional `invalidated_at`, used for commissioner correction
 - `award_key`, using one season-wide key for non-repeatable achievements and a
   week-specific key for repeatable achievements
 - `evidence` (`jsonb`), containing the pick IDs, team IDs, game IDs, and final
@@ -158,7 +159,9 @@ The database constraint is the final protection against awarding an
 achievement twice, including if an award job is retried. For a
 non-repeatable achievement, the award processor uses the same season-wide
 `award_key` for every attempt; for a repeatable achievement, it uses a
-week-specific key.
+week-specific key. Invalidated awards are hidden from player-facing reads and
+ignored as prior awards by evaluators. If a later run finds the player eligible
+again, it reactivates the same row rather than creating a duplicate.
 
 ## Awarding and week gating
 

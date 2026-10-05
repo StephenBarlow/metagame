@@ -948,6 +948,7 @@ function evaluateBadgeDrought(achievement, context) {
       const member = context.members.find(row => String(row.user_id) === String(userId));
       if (!wasMemberForEntireWindow(member, context, firstWeek)) return false;
       return !context.awards.some(award =>
+        (award.invalidated_at === null || award.invalidated_at === undefined) &&
         String(award.user_id) === String(userId) &&
         String(award.achievement_id) !== String(achievement.id) &&
         Number(award.week) >= firstWeek && Number(award.week) <= context.week

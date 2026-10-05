@@ -115,6 +115,7 @@ function page(title, content, notice, noticeType = 'success') {
     <a href="/admin/picks">Picks</a>
     <a href="/admin/messages">Messages</a>
     <a href="/admin/achievements">Achievements</a>
+    <a href="/admin/achievement-awards">Achievement awards</a>
     <a href="/admin/leagues">Leagues</a>
     <a href="/admin/users">Users</a>
   </nav></header>
@@ -841,6 +842,51 @@ function createAdminRouter({ pg, logger = console, auth = {} }) {
     const content = `<p class="muted">Achievement keys and evaluation settings are read-only here.</p>
       <div class="table-wrap"><table><thead><tr><th>Key</th><th>Name</th><th>Icon ID</th><th>Status</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5">No achievements found.</td></tr>'}</tbody></table></div>`;
     res.send(page('Achievements', content, req.query.notice, req.query.notice_type));
+  });
+
+  router.get('/achievement-awards', async (req, res) => {
+    const awards = await db('achievement_awards as awards')
+      .select([
+        'awards.id as award_id',
+        'awards.week',
+        'awards.awarded_at',
+        'leagues.id as league_id',
+        'leagues.name as league_name',
+        'achievements.key as achievement_key',
+        'achievements.name as achievement_name',
+        'members.display_name'
+      ])
+      .innerJoin('fantasy_leagues as leagues', 'leagues.id', 'awards.league_id')
+      .innerJoin('achievements', 'achievements.id', 'awards.achievement_id')
+      .leftJoin('memberships as members', function() {
+        this.on('members.user_id', '=', 'awards.user_id')
+          .andOn('members.league_id', '=', 'awards.league_id');
+      })
+      .whereNull('awards.invalidated_at')
+      .orderBy('awards.awarded_at', 'desc')
+      .orderBy('awards.id', 'desc');
+    const rows = awards.map(award => `<tr>
+      <td><a href="/admin/leagues/${award.league_id}">${escapeHtml(award.league_name)}</a></td>
+      <td>${escapeHtml(award.display_name || `User ${award.user_id}`)}</td>
+      <td><code>${escapeHtml(award.achievement_key)}</code> · ${escapeHtml(award.achievement_name)}</td>
+      <td>Week ${award.week}</td>
+      <td>${escapeHtml(new Date(award.awarded_at).toISOString())}</td>
+      <td><form method="post" action="/admin/achievement-awards/${award.award_id}/invalidate" onsubmit="return confirm('Revoke this one award?');"><button class="danger" type="submit">Revoke</button></form></td>
+    </tr>`).join('');
+    const content = `<p class="muted">Revoking hides one award from players and allows a later matching evaluation to reinstate it.</p>
+      <div class="table-wrap"><table><thead><tr><th>League</th><th>Player</th><th>Achievement</th><th>Week</th><th>Awarded</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6">No active awards found.</td></tr>'}</tbody></table></div>`;
+    res.send(page('Achievement awards', content, req.query.notice, req.query.notice_type));
+  });
+
+  router.post('/achievement-awards/:id/invalidate', async (req, res) => {
+    const id = requiredInteger(req.params.id, 'Achievement award ID');
+    const invalidated = await db('achievement_awards')
+      .where({ id })
+      .whereNull('invalidated_at')
+      .update({ invalidated_at: db.raw('CURRENT_TIMESTAMP') })
+      .returning(['id']);
+    if (!invalidated.length) throw new AdminInputError('Achievement award not found or already revoked.');
+    redirectWithNotice(res, '/admin/achievement-awards', 'Achievement award revoked.');
   });
 
   router.get('/achievements/:id/edit', async (req, res) => {

@@ -208,6 +208,7 @@ class PGDB {
       ])
       .innerJoin('achievements', 'achievements.id', 'achievement_awards.achievement_id')
       .where('achievement_awards.league_id', leagueID)
+      .whereNull('achievement_awards.invalidated_at')
       .orderBy('achievement_awards.week', 'desc')
       .orderBy('achievement_awards.awarded_at', 'desc')
       .orderBy('achievement_awards.id', 'desc');
