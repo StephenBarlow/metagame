@@ -278,3 +278,33 @@ revealed week starts a `pick-locked` one-off job. Advancing its current week
 starts a `week-finalized` reconciliation job for the prior week. Configure the
 API service with `RENDER_API_KEY` and `RENDER_BASE_SERVICE_ID` to enable those
 job launches; `RENDER_ONE_OFF_JOB_PLAN_ID` is optional.
+
+## Per-player availability report
+
+Run a read-only report for one active league member:
+
+```sh
+bun run achievements:availability -- --league-id 6 --user-id 123
+```
+
+This reports the league's enabled badges, the number of distinct badges already
+earned, and the number still potentially available. It uses a read-only database
+transaction and does not award anything. League week columns take precedence
+over the same environment defaults used by the award job. No target week or
+final-score prerequisite is required.
+
+`achievements/availability-evaluators.js` has a separate function for each badge,
+registered by its stable `key`. Each receives `(achievement, context, member)`
+and returns `{ status: 'AVAILABLE' | 'LOCKED_OUT', reason?: string }`. The shared
+context contains the league's schedule, all pick history, team and game tags,
+award history, effective current and revealed weeks, and an `asOf` timestamp.
+Future badge-specific checks can therefore inspect remaining teams, schedule
+opportunities, and season history without changing the command or award engine.
+
+For now all companion functions return `AVAILABLE`, and the report explicitly
+sets `provisional: true`. New unregistered badges also default to `AVAILABLE`.
+The shared report layer marks already-earned non-repeatable badges as `EARNED`
+and other badges in concluded leagues as `NOT_APPLICABLE`. Invalidated awards
+do not count as earned. An earned repeatable badge can also be `AVAILABLE`, so
+the `earned` and `stillAvailable` counts can overlap. Badge-specific lockout
+rules are not implemented yet; the availability count is an upper bound.

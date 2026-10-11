@@ -287,6 +287,7 @@ module.exports = {
   MODES,
   enabledAchievements,
   integerOrFallback,
+  loadEvaluationData,
   runAchievementJob,
   validateRunWindow,
   wouldCreateAwardDetails
