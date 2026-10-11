@@ -298,13 +298,31 @@ registered by its stable `key`. Each receives `(achievement, context, member)`
 and returns `{ status: 'AVAILABLE' | 'LOCKED_OUT', reason?: string }`. The shared
 context contains the league's schedule, all pick history, team and game tags,
 award history, effective current and revealed weeks, and an `asOf` timestamp.
-Future badge-specific checks can therefore inspect remaining teams, schedule
-opportunities, and season history without changing the command or award engine.
+The companions share pattern checks in `achievements/availability-patterns.js`
+and legal-pick opportunities in `achievements/availability-context.js`. They
+reuse award predicates and the existing Pick Two scoring rules. Checks cover
+team/tag combinations, calendar games, favorite teams and opponents, submission
+history and deadlines, seasonal counts, streaks, byes, and league/social badges.
+Each result includes a reason for its status.
 
-For now all companion functions return `AVAILABLE`, and the report explicitly
-sets `provisional: true`. New unregistered badges also default to `AVAILABLE`.
+Remaining opportunities account for teams consumed by past or unchangeable
+picks, games already started, the two-bye allowance, and the week-18 exception
+for picking opposing teams. Editable future picks do not permanently consume
+their teams. A recorded qualifying pick remains available if its award is still
+pending; repeatables cannot reuse a week with an existing active award. Seasonal
+thresholds require distinct teams, divisional rematches do not double-count
+opponent picks, and a bye bridges an applicable streak without contributing to it.
+
+The report sets `provisional: true`: `AVAILABLE` means an opportunity remains
+possible, not that the player is guaranteed to earn the badge. Future scores are
+unbounded, and future player choices are uncertain. Streak and standings checks
+use conservative bounds rather than solving every possible full-season outcome.
+An incomplete schedule or unknown kickoff time prevents a definitive lockout.
+Memberships, favorite teams already selected, tags, and definitions are assessed
+as currently configured; administrative changes can change a later report.
+New unregistered badges also default to `AVAILABLE` with an explicit explanation.
 The shared report layer marks already-earned non-repeatable badges as `EARNED`
 and other badges in concluded leagues as `NOT_APPLICABLE`. Invalidated awards
 do not count as earned. An earned repeatable badge can also be `AVAILABLE`, so
-the `earned` and `stillAvailable` counts can overlap. Badge-specific lockout
-rules are not implemented yet; the availability count is an upper bound.
+the `earned` and `stillAvailable` counts can overlap. The availability count is
+an upper bound when other players' choices or future results remain uncertain.

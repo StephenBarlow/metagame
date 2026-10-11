@@ -12,8 +12,9 @@ function usage() {
   bun run achievements:availability -- --league-id <id> --user-id <id>
 
 Read-only badge availability report for one active league member.
-Badge-specific availability rules currently default to AVAILABLE; estimates
-are provisional. Already-earned non-repeatable badges are reported as EARNED.`;
+Availability checks use remaining legal picks, season history, and the schedule.
+Estimates are conservative where future results or player choices are unknown.
+Already-earned non-repeatable badges are reported as EARNED.`;
 }
 
 function parseArguments(argv) {
