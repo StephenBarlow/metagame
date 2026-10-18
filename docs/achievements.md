@@ -326,3 +326,27 @@ and other badges in concluded leagues as `NOT_APPLICABLE`. Invalidated awards
 do not count as earned. An earned repeatable badge can also be `AVAILABLE`, so
 the `earned` and `stillAvailable` counts can overlap. The availability count is
 an upper bound when other players' choices or future results remain uncertain.
+
+### League-wide lockouts
+
+```sh
+bun run achievements:availability -- --league-id 6 --all-players
+```
+
+This runs the same checks for every active member using one read-only snapshot.
+It returns `unavailableBadges`: badges for which nobody has status `AVAILABLE`.
+Each entry includes the number of earned and locked-out players, individual
+lockout reasons, and `earnedInLeague` (whether any non-invalidated award exists,
+including awards to members who have since been revoked).
+
+`unavailableToEveryone` counts those badges; `unearnedAndUnavailable` counts the
+subset never earned by anyone in the league. Already-earned non-repeatables
+cannot be earned again, so a badge may be unavailable through a combination of
+`EARNED` and `LOCKED_OUT` players. Earned repeatables still count as available if
+another opportunity remains. Empty rosters and concluded leagues are not
+classified as league-wide badge lockouts.
+
+These are conservative availability findings under the current roster, schedule,
+and definitions, with the same `provisional: true` qualification as individual
+reports. A player's pending qualifying pick also keeps that badge off the list.
+The report does not estimate the statistical likelihood of earning each badge.

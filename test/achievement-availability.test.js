@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { buildAvailabilityReport, runAvailabilityReport } = require('../achievements/availability');
+const { buildAvailabilityReport, buildLeagueAvailabilityReport, runAvailabilityReport } = require('../achievements/availability');
 const { availabilityRegistry, evaluateAchievementAvailability } = require('../achievements/availability-evaluators');
 const { buildEvaluationContext } = require('../achievements/context');
 const { parseArguments } = require('../jobs/achievement-availability');
@@ -141,6 +141,70 @@ test('availability requires an active league member and valid identifiers', asyn
   await assert.rejects(runAvailabilityReport(null, { leagueId: 6, userId: -1 }), /userId/);
   assert.deepEqual(parseArguments(['--league-id=6', '--user-id', '10']), { leagueId: '6', userId: '10' });
   assert.throws(() => parseArguments(['--league-id', '--user-id', '10']), /Missing value/);
+  assert.deepEqual(parseArguments(['--league-id=6', '--all-players']), { leagueId: '6', allPlayers: true });
+  assert.throws(() => parseArguments(['--all-players', '--user-id', '10']), /not both/);
+  await assert.rejects(runAvailabilityReport(null, { leagueId: 6, userId: 10, allPlayers: true }), /not both/);
+});
+
+test('league reports separate unclaimed lockouts, earned badges, and available repeatables', () => {
+  const achievements = ['YARRR', 'CAT_PERSON', 'BLUE_COLLAR', 'DAMN_FINE_PICK'].map(key => definition(key));
+  const context = scenario({
+    games: [game(1, 5, 'TB', 'LV'), game(2, 5, 'A', 'B')],
+    members: [{ user_id: 10, display_name: 'One' }, { user_id: 20, display_name: 'Two' }],
+    awards: [
+      { user_id: 10, achievement_id: definition('CAT_PERSON').id, week: 1, invalidated_at: null },
+      { user_id: 20, achievement_id: definition('CAT_PERSON').id, week: 1, invalidated_at: null },
+      { user_id: 10, achievement_id: definition('BLUE_COLLAR').id, week: 1, invalidated_at: null },
+      { user_id: 10, achievement_id: definition('DAMN_FINE_PICK').id, week: 1, invalidated_at: null }
+    ]
+  });
+  const report = buildLeagueAvailabilityReport(achievements, context);
+  assert.equal(report.memberCount, 2);
+  assert.equal(report.total, 4);
+  assert.equal(report.stillAvailable, 1);
+  assert.equal(report.unavailableToEveryone, 3);
+  assert.equal(report.unearnedAndUnavailable, 1);
+  const pirate = report.unavailableBadges.find(badge => badge.key === 'YARRR');
+  assert.equal(pirate.earnedInLeague, false);
+  assert.equal(pirate.lockedOutPlayers, 2);
+  assert.equal(pirate.lockouts[0].displayName, 'One');
+  assert.match(pirate.lockouts[0].reason, /No remaining legal pair/);
+  const blue = report.unavailableBadges.find(badge => badge.key === 'BLUE_COLLAR');
+  assert.equal(blue.earnedPlayers, 1);
+  assert.equal(blue.lockedOutPlayers, 1);
+  assert.equal(report.unavailableBadges.find(badge => badge.key === 'CAT_PERSON').earnedPlayers, 2);
+  assert.ok(!report.unavailableBadges.some(badge => badge.key === 'DAMN_FINE_PICK'));
+
+  // A former member's valid award means the badge has already been claimed.
+  context.awards.push({ user_id: 99, achievement_id: definition('YARRR').id, week: 1, invalidated_at: null });
+  assert.equal(buildLeagueAvailabilityReport(achievements, context).unearnedAndUnavailable, 0);
+  context.awards.at(-1).invalidated_at = '2026-10-18T00:00:00Z';
+  assert.equal(buildLeagueAvailabilityReport(achievements, context).unearnedAndUnavailable, 1);
+});
+
+test('one remaining eligible player keeps a badge off the league-wide lockout list', () => {
+  const context = scenario({
+    games: [game(1, 1, 'TB', 'A'), game(2, 1, 'B', 'C'), game(3, 5, 'TB', 'D'), game(4, 5, 'LV', 'E')],
+    members: [{ user_id: 10 }, { user_id: 20 }],
+    selections: [{ userId: 10, week: 1, teams: ['TB', 'B'] }]
+  });
+  const report = buildLeagueAvailabilityReport([definition('YARRR')], context);
+  assert.equal(report.stillAvailable, 1);
+  assert.equal(report.unavailableToEveryone, 0);
+  assert.deepEqual(report.unavailableBadges, []);
+});
+
+test('empty and concluded leagues do not generate blanket league-wide lockouts', () => {
+  const achievements = [definition('YARRR'), definition('CAT_PERSON')];
+  const empty = buildLeagueAvailabilityReport(achievements, contextFixture({ members: [] }));
+  assert.equal(empty.memberCount, 0);
+  assert.equal(empty.unavailableToEveryone, 0);
+  const concluded = buildLeagueAvailabilityReport(achievements, contextFixture({
+    currentSeason: '2027',
+    awards: [{ user_id: 10, achievement_id: definition('CAT_PERSON').id, invalidated_at: null }]
+  }));
+  assert.equal(concluded.concluded, true);
+  assert.equal(concluded.unavailableToEveryone, 0);
 });
 
 test('team combinations exclude spent teams but release editable future reservations', () => {

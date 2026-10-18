@@ -10,8 +10,10 @@ const { runAvailabilityReport } = require('../achievements/availability');
 function usage() {
   return `Usage:
   bun run achievements:availability -- --league-id <id> --user-id <id>
+  bun run achievements:availability -- --league-id <id> --all-players
 
-Read-only badge availability report for one active league member.
+Read-only badge availability report for one active league member, or use
+--all-players to list badges that no active member can still earn.
 Availability checks use remaining legal picks, season history, and the schedule.
 Estimates are conservative where future results or player choices are unknown.
 Already-earned non-repeatable badges are reported as EARNED.`;
@@ -23,6 +25,10 @@ function parseArguments(argv) {
   const flags = { '--league-id': 'leagueId', '--user-id': 'userId' };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
+    if (argument === '--all-players') {
+      options.allPlayers = true;
+      continue;
+    }
     const [flag] = argument.split('=');
     const option = flags[flag];
     if (!option) throw new Error(`Unknown argument: ${argument}`);
@@ -30,6 +36,7 @@ function parseArguments(argv) {
     if (!value || value.startsWith('--')) throw new Error(`Missing value for ${flag}.`);
     options[option] = value;
   }
+  if (options.allPlayers && options.userId !== undefined) throw new Error('Use either --all-players or --user-id, not both.');
   return options;
 }
 
